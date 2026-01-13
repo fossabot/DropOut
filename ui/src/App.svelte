@@ -2,8 +2,10 @@
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
   import DownloadMonitor from "./lib/DownloadMonitor.svelte";
+  import GameConsole from "./lib/GameConsole.svelte";
 
   let status = "Ready";
+  let showConsole = false;
 
   interface Version {
       id: string;
@@ -149,20 +151,26 @@
 
     <!-- Bottom Bar -->
     <div class="h-24 bg-zinc-900 border-t border-zinc-800 flex items-center px-8 justify-between z-20 shadow-2xl">
-        <div class="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity" onclick={login} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && login()}>
-            <div class="w-12 h-12 rounded bg-gradient-to-tr from-indigo-500 to-purple-500 shadow-lg flex items-center justify-center text-white font-bold text-xl overflow-hidden">
-                {#if currentAccount}
-                    <img src={`https://minotar.net/avatar/${currentAccount.username}/48`} alt={currentAccount.username} class="w-full h-full">
-                {:else}
-                    ?
-                {/if}
-            </div>
-            <div>
-                <div class="font-bold text-white text-lg">{currentAccount ? currentAccount.username : "Click to Login"}</div>
-                <div class="text-xs text-zinc-400 flex items-center gap-1">
-                    <span class="w-1.5 h-1.5 rounded-full {currentAccount ? 'bg-green-500' : 'bg-zinc-500'}"></span> {currentAccount ? 'Ready' : 'Guest'}
+        <div class="flex items-center gap-4">
+             <div class="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity" onclick={login} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && login()}>
+                <div class="w-12 h-12 rounded bg-gradient-to-tr from-indigo-500 to-purple-500 shadow-lg flex items-center justify-center text-white font-bold text-xl overflow-hidden">
+                    {#if currentAccount}
+                        <img src={`https://minotar.net/avatar/${currentAccount.username}/48`} alt={currentAccount.username} class="w-full h-full">
+                    {:else}
+                        ?
+                    {/if}
+                </div>
+                <div>
+                    <div class="font-bold text-white text-lg">{currentAccount ? currentAccount.username : "Click to Login"}</div>
+                    <div class="text-xs text-zinc-400 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full {currentAccount ? 'bg-green-500' : 'bg-zinc-500'}"></span> {currentAccount ? 'Ready' : 'Guest'}
+                    </div>
                 </div>
             </div>
+            <!-- Console Toggle -->
+            <button class="ml-4 text-xs text-zinc-500 hover:text-zinc-300 transition" onclick={() => showConsole = !showConsole}>
+                {showConsole ? 'Hide Logs' : 'Show Logs'}
+            </button>
         </div>
 
         <div class="flex items-center gap-4">
@@ -197,4 +205,6 @@
       <div class="font-mono text-sm whitespace-pre-wrap">{status}</div>
   </div>
   {/if}
+
+  <GameConsole visible={showConsole} />
 </div>
