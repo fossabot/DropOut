@@ -73,8 +73,7 @@ pub fn generate_offline_uuid(username: &str) -> String {
 // --- Microsoft Auth Logic ---
 
 // Constants
-// Using a common public client ID for Minecraft Launchers
-const CLIENT_ID: &str = "00000000-402b-802d-0000-000000000000"; 
+const CLIENT_ID: &str = "fe165602-5410-4441-92f7-326e10a7cb82"; 
 const SCOPE: &str = "XboxLive.Signin offline_access openid profile email";
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -215,7 +214,9 @@ pub async fn method_xbox_live(ms_access_token: &str) -> Result<(String, String),
         .map_err(|e| e.to_string())?;
 
     if !resp.status().is_success() {
-         return Err(format!("Xbox Live auth failed: {}", resp.status()));
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!("Xbox Live auth failed: {} - {}", status, text));
     }
 
     let xbl_resp: XboxLiveResponse = resp.json().await.map_err(|e| e.to_string())?;
@@ -277,7 +278,9 @@ pub async fn login_minecraft(xsts_token: &str, uhs: &str) -> Result<String, Stri
         .map_err(|e| e.to_string())?;
 
     if !resp.status().is_success() {
-         return Err(format!("Minecraft auth failed: {}", resp.status()));
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_else(|_| "No body".to_string());
+        return Err(format!("Minecraft auth failed: {} - Body: {}", status, text));
     }
 
     let mc_resp: MinecraftAuthResponse = resp.json().await.map_err(|e| e.to_string())?;
@@ -296,9 +299,45 @@ pub async fn fetch_profile(mc_access_token: &str) -> Result<MinecraftProfile, St
         .map_err(|e| e.to_string())?;
 
     if !resp.status().is_success() {
-         return Err(format!("Profile fetch failed: {}", resp.status()));
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!("Profile fetch failed: {} - {}", status, text));
     }
 
     let profile: MinecraftProfile = resp.json().await.map_err(|e| e.to_string())?;
     Ok(profile)
+}
+
+// 7. Check Game Ownership
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Entitlement {
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EntitlementsResponse {
+    pub items: Vec<Entitlement>,
+    pub signature: Option<String>,
+    pub keyId: Option<String>,
+}
+
+pub async fn check_ownership(mc_access_token: &str) -> Result<bool, String> {
+    let client = reqwest::Client::new();
+    let url = "https://api.minecraftservices.com/entitlements/mcstore";
+
+    let resp = client.get(url)
+        .bearer_auth(mc_access_token)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !resp.status().is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!("Entitlement check failed: {} - {}", resp.status(), text));
+    }
+
+    let body: EntitlementsResponse = resp.json().await.map_err(|e| e.to_string())?;
+    // We look for "product_minecraft" or "game_minecraft"
+    let owns_game = body.items.iter().any(|e| e.name == "product_minecraft" || e.name == "game_minecraft");
+    Ok(owns_game)
 }
