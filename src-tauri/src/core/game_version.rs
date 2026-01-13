@@ -44,6 +44,21 @@ pub struct AssetIndex {
 pub struct Library {
     pub downloads: Option<LibraryDownloads>,
     pub name: String,
+    pub rules: Option<Vec<Rule>>,
+    pub natives: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Rule {
+    pub action: String, // "allow" or "disallow"
+    pub os: Option<OsRule>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OsRule {
+    pub name: Option<String>, // "linux", "osx", "windows"
+    pub version: Option<String>, // Regex
+    pub arch: Option<String>, // "x86"
 }
 
 #[derive(Debug, Deserialize)]

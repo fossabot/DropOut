@@ -1,6 +1,5 @@
 // utils/mod.rs
-pub mod file_utils;
-pub mod config_parser;
+pub mod zip;
 
 // 文件操作相关的实用工具函数
 pub mod file_utils {
