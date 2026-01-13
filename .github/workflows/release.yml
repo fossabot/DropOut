@@ -82,10 +82,23 @@ jobs:
         include:
           - target: x86_64-apple-darwin
             arch_name: x86_64
-            os: macos-13
+            os: macos-14
+          - target: aarch64-apple-darwin
+            arch_name: aarch64
+            os: macos-14
+          - target: universal-apple-darwin
+            arch_name: universal
+            os: macos-14
+          - target: x86_64-apple-darwin
+            arch_name: x86_64
+            os: macos-latest
           - target: aarch64-apple-darwin
             arch_name: aarch64
             os: macos-latest
+          - target: universal-apple-darwin
+            arch_name: universal
+            os: macos-latest
+            
     steps:
       - uses: actions/checkout@v4
 
