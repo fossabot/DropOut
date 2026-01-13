@@ -13,14 +13,17 @@ mod utils;
 #[tauri::command]
 async fn start_game(
     window: Window,
-    state: State<'_, core::auth::AccountState>,
+    auth_state: State<'_, core::auth::AccountState>,
+    config_state: State<'_, core::config::ConfigState>,
     version_id: String
 ) -> Result<String, String> {
     println!("Backend received StartGame for {}", version_id);
     
     // Check for active account
-    let account = state.active_account.lock().unwrap().clone()
+    let account = auth_state.active_account.lock().unwrap().clone()
         .ok_or("No active account found. Please login first.")?;
+    
+    let config = config_state.config.lock().unwrap().clone();
 
     // Get App Data Directory (e.g., ~/.local/share/com.dropout.launcher or similar)
     // The identifier is set in tauri.conf.json.
@@ -232,8 +235,8 @@ async fn start_game(
     // We inject standard convenient defaults.
     // TODO: Parse 'arguments.jvm' from version.json for full compatibility (Mac M1 support etc)
     args.push(format!("-Djava.library.path={}", natives_path));
-    args.push("-Xmx2G".to_string()); // Default memory
-    args.push("-Xms1G".to_string());
+    args.push(format!("-Xmx{}M", config.max_memory)); 
+    args.push(format!("-Xms{}M", config.min_memory));
     args.push("-cp".to_string());
     args.push(classpath);
 
@@ -322,7 +325,7 @@ async fn start_game(
     println!("Launch Args: {:?}", args);
     
     // Spawn the process
-    let mut command = Command::new("java");
+    let mut command = Command::new(&config.java_path);
     command.args(&args);
     command.current_dir(&game_dir); // Run in game directory
     command.stdout(Stdio::piped());
@@ -389,11 +392,41 @@ async fn logout(state: State<'_, core::auth::AccountState>) -> Result<(), String
     Ok(())
 }
 
+#[tauri::command]
+async fn get_settings(
+    state: State<'_, core::config::ConfigState>,
+) -> Result<core::config::LauncherConfig, String> {
+    Ok(state.config.lock().unwrap().clone())
+}
+
+#[tauri::command]
+async fn save_settings(
+    state: State<'_, core::config::ConfigState>,
+    config: core::config::LauncherConfig,
+) -> Result<(), String> {
+    *state.config.lock().unwrap() = config;
+    state.save()?;
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(core::auth::AccountState::new())
-        .invoke_handler(tauri::generate_handler![start_game, get_versions, login_offline, get_active_account, logout])
+        .setup(|app| {
+            let config_state = core::config::ConfigState::new(app.handle());
+            app.manage(config_state);
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            start_game, 
+            get_versions, 
+            login_offline, 
+            get_active_account, 
+            logout,
+            get_settings,
+            save_settings
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
