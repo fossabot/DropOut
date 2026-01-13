@@ -13,9 +13,27 @@ DropOut is a modern, fast, and efficient Minecraft launcher built with the lates
   - Efficient asset and library downloading
   - Custom Java arguments support
 
+## Supported Platforms
+
+| Platform          | Architecture          | Status |
+| ----------------- | --------------------- | ------ |
+| **Linux**   | x86_64                | Done   |
+| **Linux**   | ARM64                 | Done   |
+| **macOS**   | ARM64 (Apple Silicon) | Done   |
+| **Windows** | x86_64                | Done   |
+| **Windows** | ARM64                 | Done   |
+
 ## Installation
 
-*(Pre-built binaries coming soon to the [Releases](https://github.com/HsiangNianian/DropOut/releases) page)*
+Download the latest release for your platform from the [Releases](https://github.com/HsiangNianian/DropOut/releases) page.
+
+| Platform       | Files                   |
+| -------------- | ----------------------- |
+| Linux x86_64   | `.deb`, `.AppImage` |
+| Linux ARM64    | `.deb`, `.AppImage` |
+| macOS ARM64    | `.dmg`                |
+| Windows x86_64 | `.msi`, `.exe`      |
+| Windows ARM64  | `.msi`, `.exe`      |
 
 ## Building from Source
 
