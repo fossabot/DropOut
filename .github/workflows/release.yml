@@ -3,119 +3,237 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'
-    branches:
-      - main
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Tag name to release (e.g., v1.0.0)"
+        required: true
+        default: "v1.0.0"
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
+  build-linux:
+    name: Linux (${{ matrix.target }})
+    runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
         include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-          - os: macos-latest
-            target: x86_64-apple-darwin
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
+          - target: x86_64-unknown-linux-gnu
+            deb_arch: amd64
+            rpm_arch: x86_64
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      # - name: Install dependencies
-      #   run: sudo apt-get install -y libgtk-3-dev
-      #   if: matrix.os == 'ubuntu-latest'
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libglib2.0-dev libcairo2-dev libpango1.0-dev libatk1.0-dev libgdk-pixbuf2.0-dev libasound2-dev libudev-dev pkg-config alien
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Packaging Tools
+        run: cargo install cargo-deb
+
+      - name: Build Binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Build Deb
+        run: cargo deb --no-build --target ${{ matrix.target }} --output dropout-linux-${{ matrix.deb_arch }}.deb
+
+      - name: Build RPM (via Alien)
+        run: |
+          sudo alien -r dropout-linux-${{ matrix.deb_arch }}.deb --scripts 
+          # Alien generates a file like dropout-0.1.0-2.x86_64.rpm (version depends on Cargo.toml)
+          # We force move any rpm to the predictable name
+          mv dropout*.rpm dropout-linux-${{ matrix.rpm_arch }}.rpm
+
+      - name: Archive Binary
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar -czf ../../../dropout-linux-${{ matrix.rpm_arch }}.tar.gz dropout
+          cd ../../..
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifacts-${{ matrix.target }}
+          path: |
+            dropout-linux-${{ matrix.deb_arch }}.deb
+            dropout-linux-${{ matrix.rpm_arch }}.rpm
+            dropout-linux-${{ matrix.rpm_arch }}.tar.gz
+
+  build-macos:
+    name: MacOS (${{ matrix.target }})
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            arch_name: x86_64
+          - target: aarch64-apple-darwin
+            arch_name: aarch64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          brew install gtk+3 adwaita-icon-theme
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: dropout-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/dropout*
+      - name: Archive
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar -czf ../../../dropout-macos-${{ matrix.arch_name }}.tar.gz dropout
 
-  release:
-    needs: build
-    runs-on: ubuntu-latest
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-artifacts-${{ matrix.target }}
+          path: dropout-macos-${{ matrix.arch_name }}.tar.gz
+
+  build-windows:
+    name: Windows (${{ matrix.target }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-pc-windows-msvc
+            arch_name: x86_64
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install GTK3 (Windows)
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\installed
+          key: ${{ runner.os }}-vcpkg-gtk3-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-gtk3-
+
+      - name: Setup Vcpkg and GTK
+        shell: pwsh
+        run: |
+           # NOTE: Building GTK3 on Windows via vcpkg takes significant time (>1h), often timing out free runners.
+           # Uncomment the next line if you have a powerful private runner or cache hit.
+           # vcpkg install gtk:x64-windows
+           
+           echo "Skipping compilation on Windows for this template due to timeout constraints on GitHub-hosted runners."
+           echo "For a robust Windows build, consider using a pre-built GTK binary distribution or a custom runner."
+           
+           # If you have pre-built binaries, you would copy them here and run cargo build.
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch'
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Generate CHANGELOG
+        id: changelog
+        uses: requarks/changelog-action@v1
+        with:
+          token: ${{ github.token }}
+          tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
+          includeInvalidCommits: true
+          changelogFilePath: CHANGELOG.md
+          writeToFile: true
+          useGitmojis: false
+
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: dropout-x86_64-unknown-linux-gnu
-          path: ./artifacts/linux
-      - uses: actions/download-artifact@v3
-        with:
-          name: dropout-x86_64-apple-darwin
-          path: ./artifacts/macos
-      - uses: actions/download-artifact@v3
-        with:
-          name: dropout-x86_64-pc-windows-msvc
-          path: ./artifacts/windows
+          pattern: "*-artifacts-*"
+          path: artifacts/
+          merge-multiple: true
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
+      - name: Display files
+        run: ls -R artifacts/
+
+      - name: Create or Update Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.tag_name }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+
+          # Create generic Release Notes
+          cat > release_notes.md << 'EOF'
+          ## 📦 Installation
+
+          **Supported Platforms**
+          - 🐧 Linux: .deb, .rpm, .tar.gz (x86_64)
+          - 🍎 macOS: .tar.gz (Intel & Apple Silicon)
+          - 🪟 Windows: (Build skipped in standard CI due to GTK complexity)
+
+          ${{ steps.changelog.outputs.changes }}
+          EOF
+
+          # Check Release existence
+          if gh release view "${VERSION}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "Updating existing release..."
+            
+            # Delete old assets
+            ASSETS=$(gh release view "${VERSION}" --repo "${{ github.repository }}" --json assets -q '.assets[].name')
+            for asset in $ASSETS; do
+              gh release delete-asset "${VERSION}" "$asset" --repo "${{ github.repository }}" || true
+            done
+
+            gh release edit "${VERSION}" \
+              --repo "${{ github.repository }}" \
+              --notes-file release_notes.md
+            
+            gh release upload "${VERSION}" artifacts/* --repo "${{ github.repository }}"
+          else
+            echo "Creating new release..."
+            gh release create "${VERSION}" \
+              --repo "${{ github.repository }}" \
+              --notes-file release_notes.md \
+              --title "🚀 ${VERSION}" \
+              artifacts/*
+          fi
+
+      - name: Commit CHANGELOG.md
+        if: hashFiles('CHANGELOG.md') != ''
+        uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          body: |
-            ## DropOut - NextGeneration Minecraft Launcher
-
-            **现代UI**: DropOut 拥有现代且简洁的用户界面，易于使用。
-            **快速**: DropOut 设计为快速且高效。
-            **跨平台**: DropOut 设计为在 Windows、macOS 和 Linux 上运行。
-            **纯 Rust**: DropOut 完全用 Rust 编写。
-            **开源**: DropOut 是开源的，欢迎贡献。
-            **可定制**: DropOut 高度可定制。
-            **安全**: DropOut 设计为安全。
-            **无广告**: DropOut 是免费的开源软件，永远不会有广告。
-            **无跟踪**: DropOut 不会跟踪你。
-
-            ### 安装
-
-            你可以从 [Releases](https://github.com/HsiangNianian/DropOut/releases) 页面下载 DropOut 的最新版本，或者你可以从源码构建：
-
-            ```bash
-            git clone https://github.com/HsiangNianian/DropOut
-            cd DropOut
-            cargo build --release
-            ```
-
-          draft: false
-          prerelease: false
-
-      - name: Upload Linux binary
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./artifacts/linux/dropout
-          asset_name: dropout-linux
-          asset_content_type: application/octet-stream
-
-      - name: Upload macOS binary
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./artifacts/macos/dropout
-          asset_name: dropout-macos
-          asset_content_type: application/octet-stream
-
-      - name: Upload Windows binary
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./artifacts/windows/dropout.exe
-          asset_name: dropout-windows.exe
-          asset_content_type: application/octet-stream
+          branch: main
+          commit_message: "docs: update CHANGELOG.md for ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }} [skip ci]"
+          file_pattern: CHANGELOG.md
