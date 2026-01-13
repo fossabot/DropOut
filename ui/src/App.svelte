@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { getVersion } from "@tauri-apps/api/app";
   import { open } from "@tauri-apps/plugin-shell";
   import { onMount } from "svelte";
   import DownloadMonitor from "./lib/DownloadMonitor.svelte";
@@ -9,6 +10,7 @@
   let showConsole = false;
   let currentView = "home";
   let statusTimeout: any;
+  let appVersion = "...";
 
   // Watch for status changes to auto-dismiss
   $: if (status !== "Ready") {
@@ -70,6 +72,7 @@
   onMount(async () => {
     checkAccount();
     loadSettings();
+    getVersion().then((v) => (appVersion = v));
     try {
       versions = await invoke("get_versions");
       if (versions.length > 0) {
@@ -330,7 +333,7 @@
     <div
       class="p-4 w-full border-t border-zinc-800 flex justify-center lg:justify-start"
     >
-      <div class="text-xs text-zinc-600 font-mono">v0.1.3</div>
+      <div class="text-xs text-zinc-600 font-mono">v{appVersion}</div>
     </div>
   </aside>
 
