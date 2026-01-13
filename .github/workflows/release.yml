@@ -14,9 +14,14 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: write
+
 jobs:
   promote-release:
     name: Create Release & Changelog
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     outputs:
       release_id: ${{ steps.create_release.outputs.id }}
