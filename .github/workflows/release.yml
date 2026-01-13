@@ -59,11 +59,13 @@ jobs:
       matrix:
         include:
           - platform: "ubuntu-22.04"
-            args: ""
-          - platform: "macos-14" # M1/M2/M3 (Apple Silicon)
+            args: "--target x86_64-unknown-linux-gnu"
+          - platform: "macos-14" 
+            args: "--target x86_64-apple-darwin"
+          - platform: "macos-latest"
             args: "--target aarch64-apple-darwin"
           - platform: "windows-latest"
-            args: ""
+            args: "--target x86_64-pc-windows-msvc"
 
     runs-on: ${{ matrix.platform }}
     steps:
