@@ -1,6 +1,6 @@
 [package]
 name = "dropout"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2021"
 authors = ["HsiangNianian"]
 description = "The DropOut Minecraft Game Launcher"
