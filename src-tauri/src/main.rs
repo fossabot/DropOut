@@ -114,35 +114,16 @@ async fn start_game(
 
     emit_log!(window, format!("Game directory: {:?}", game_dir));
 
-    // 1. Fetch manifest to find the version URL
-    emit_log!(window, "Fetching version manifest...".to_string());
-    let manifest = core::manifest::fetch_version_manifest()
-        .await
-        .map_err(|e| e.to_string())?;
+    // 1. Load version (supports both vanilla and modded versions with inheritance)
     emit_log!(
         window,
-        format!("Found {} versions in manifest", manifest.versions.len())
+        format!("Loading version details for {}...", version_id)
     );
-
-    // Find the version info
-    let version_info = manifest
-        .versions
-        .iter()
-        .find(|v| v.id == version_id)
-        .ok_or_else(|| format!("Version {} not found in manifest", version_id))?;
-
-    // 2. Fetch specific version JSON (client.jar info)
-    emit_log!(
-        window,
-        format!("Fetching version details for {}...", version_id)
-    );
-    let version_url = &version_info.url;
-    let version_details: core::game_version::GameVersion = reqwest::get(version_url)
-        .await
-        .map_err(|e| e.to_string())?
-        .json()
+    
+    let version_details = core::manifest::load_version(&game_dir, &version_id)
         .await
         .map_err(|e| e.to_string())?;
+    
     emit_log!(
         window,
         format!(
@@ -151,20 +132,30 @@ async fn start_game(
         )
     );
 
-    // 3. Prepare download tasks
+    // Determine the actual minecraft version for client.jar
+    // (for modded versions, this is the parent vanilla version)
+    let minecraft_version = version_details
+        .inherits_from
+        .clone()
+        .unwrap_or_else(|| version_id.clone());
+
+    // 2. Prepare download tasks
     emit_log!(window, "Preparing download tasks...".to_string());
     let mut download_tasks = Vec::new();
 
     // --- Client Jar ---
-    let client_jar = version_details.downloads.client;
+    // Get downloads from version_details (may be inherited)
+    let downloads = version_details.downloads.as_ref()
+        .ok_or("Version has no downloads information")?;
+    let client_jar = &downloads.client;
     let mut client_path = game_dir.join("versions");
-    client_path.push(&version_id);
-    client_path.push(format!("{}.jar", version_id));
+    client_path.push(&minecraft_version);
+    client_path.push(format!("{}.jar", minecraft_version));
 
     download_tasks.push(core::downloader::DownloadTask {
-        url: client_jar.url,
+        url: client_jar.url.clone(),
         path: client_path.clone(),
-        sha1: Some(client_jar.sha1),
+        sha1: client_jar.sha1.clone(),
     });
 
     // --- Libraries ---
@@ -174,7 +165,7 @@ async fn start_game(
 
     for lib in &version_details.libraries {
         if core::rules::is_library_allowed(&lib.rules) {
-            // 1. Standard Library
+            // 1. Standard Library - check for explicit downloads first
             if let Some(downloads) = &lib.downloads {
                 if let Some(artifact) = &downloads.artifact {
                     let path_str = artifact
@@ -188,7 +179,7 @@ async fn start_game(
                     download_tasks.push(core::downloader::DownloadTask {
                         url: artifact.url.clone(),
                         path: lib_path,
-                        sha1: Some(artifact.sha1.clone()),
+                        sha1: artifact.sha1.clone(),
                     });
                 }
 
@@ -221,11 +212,27 @@ async fn start_game(
                             download_tasks.push(core::downloader::DownloadTask {
                                 url: native_artifact.url,
                                 path: native_path.clone(),
-                                sha1: Some(native_artifact.sha1),
+                                sha1: native_artifact.sha1,
                             });
 
                             native_libs_paths.push(native_path);
                         }
+                    }
+                }
+            } else {
+                // 3. Library without explicit downloads (mod loader libraries)
+                // Use Maven coordinate resolution
+                if let Some(url) = core::maven::resolve_library_url(
+                    &lib.name,
+                    None,
+                    lib.url.as_deref(),
+                ) {
+                    if let Some(lib_path) = core::maven::get_library_path(&lib.name, &libraries_dir) {
+                        download_tasks.push(core::downloader::DownloadTask {
+                            url,
+                            path: lib_path,
+                            sha1: None, // Maven libraries often don't have SHA1 in the JSON
+                        });
                     }
                 }
             }
@@ -238,8 +245,12 @@ async fn start_game(
     let objects_dir = assets_dir.join("objects");
     let indexes_dir = assets_dir.join("indexes");
 
+    // Get asset index (may be inherited from parent)
+    let asset_index = version_details.asset_index.as_ref()
+        .ok_or("Version has no asset index information")?;
+
     // Download Asset Index JSON
-    let asset_index_path = indexes_dir.join(format!("{}.json", version_details.asset_index.id));
+    let asset_index_path = indexes_dir.join(format!("{}.json", asset_index.id));
 
     // Check if index exists or download it
     // Note: We need the content of this file to parse it.
@@ -253,9 +264,9 @@ async fn start_game(
     } else {
         println!(
             "Downloading asset index from {}",
-            version_details.asset_index.url
+            asset_index.url
         );
-        let content = reqwest::get(&version_details.asset_index.url)
+        let content = reqwest::get(&asset_index.url)
             .await
             .map_err(|e| e.to_string())?
             .text()
@@ -417,7 +428,7 @@ async fn start_game(
     replacements.insert("${assets_root}", assets_dir.to_string_lossy().to_string());
     replacements.insert(
         "${assets_index_name}",
-        version_details.asset_index.id.clone(),
+        asset_index.id.clone(),
     );
     replacements.insert("${auth_uuid}", account.uuid());
     replacements.insert("${auth_access_token}", account.access_token());
@@ -846,6 +857,154 @@ async fn get_recommended_java(
     Ok(core::java::get_recommended_java(required_major_version))
 }
 
+// ==================== Fabric Loader Commands ====================
+
+/// Get Minecraft versions supported by Fabric
+#[tauri::command]
+async fn get_fabric_game_versions() -> Result<Vec<core::fabric::FabricGameVersion>, String> {
+    core::fabric::fetch_supported_game_versions()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Get available Fabric loader versions
+#[tauri::command]
+async fn get_fabric_loader_versions() -> Result<Vec<core::fabric::FabricLoaderVersion>, String> {
+    core::fabric::fetch_loader_versions()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Get Fabric loaders available for a specific Minecraft version
+#[tauri::command]
+async fn get_fabric_loaders_for_version(
+    game_version: String,
+) -> Result<Vec<core::fabric::FabricLoaderEntry>, String> {
+    core::fabric::fetch_loaders_for_game_version(&game_version)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Install Fabric loader for a specific Minecraft version
+#[tauri::command]
+async fn install_fabric(
+    window: Window,
+    game_version: String,
+    loader_version: String,
+) -> Result<core::fabric::InstalledFabricVersion, String> {
+    emit_log!(
+        window,
+        format!(
+            "Installing Fabric {} for Minecraft {}...",
+            loader_version, game_version
+        )
+    );
+
+    let app_handle = window.app_handle();
+    let game_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+
+    let result = core::fabric::install_fabric(&game_dir, &game_version, &loader_version)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    emit_log!(
+        window,
+        format!("Fabric installed successfully: {}", result.id)
+    );
+
+    Ok(result)
+}
+
+/// List installed Fabric versions
+#[tauri::command]
+async fn list_installed_fabric_versions(window: Window) -> Result<Vec<String>, String> {
+    let app_handle = window.app_handle();
+    let game_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+
+    core::fabric::list_installed_fabric_versions(&game_dir)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Check if Fabric is installed for a specific version
+#[tauri::command]
+async fn is_fabric_installed(
+    window: Window,
+    game_version: String,
+    loader_version: String,
+) -> Result<bool, String> {
+    let app_handle = window.app_handle();
+    let game_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+
+    Ok(core::fabric::is_fabric_installed(
+        &game_dir,
+        &game_version,
+        &loader_version,
+    ))
+}
+
+// ==================== Forge Loader Commands ====================
+
+/// Get Minecraft versions supported by Forge
+#[tauri::command]
+async fn get_forge_game_versions() -> Result<Vec<String>, String> {
+    core::forge::fetch_supported_game_versions()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Get available Forge versions for a specific Minecraft version
+#[tauri::command]
+async fn get_forge_versions_for_game(
+    game_version: String,
+) -> Result<Vec<core::forge::ForgeVersion>, String> {
+    core::forge::fetch_forge_versions(&game_version)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Install Forge for a specific Minecraft version
+#[tauri::command]
+async fn install_forge(
+    window: Window,
+    game_version: String,
+    forge_version: String,
+) -> Result<core::forge::InstalledForgeVersion, String> {
+    emit_log!(
+        window,
+        format!(
+            "Installing Forge {} for Minecraft {}...",
+            forge_version, game_version
+        )
+    );
+
+    let app_handle = window.app_handle();
+    let game_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+
+    let result = core::forge::install_forge(&game_dir, &game_version, &forge_version)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    emit_log!(
+        window,
+        format!("Forge installed successfully: {}", result.id)
+    );
+
+    Ok(result)
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -887,7 +1046,18 @@ fn main() {
             complete_microsoft_login,
             refresh_account,
             detect_java,
-            get_recommended_java
+            get_recommended_java,
+            // Fabric commands
+            get_fabric_game_versions,
+            get_fabric_loader_versions,
+            get_fabric_loaders_for_version,
+            install_fabric,
+            list_installed_fabric_versions,
+            is_fabric_installed,
+            // Forge commands
+            get_forge_game_versions,
+            get_forge_versions_for_game,
+            install_forge
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
