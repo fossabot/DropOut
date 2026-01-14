@@ -33,12 +33,8 @@ jobs:
             wayland: true
           - platform: "windows-latest"
             name: "Windows"
-            pr_only: true
           - platform: "macos-14"
             name: "macOS"
-            pr_only: true
-    # Exclude PR-only platforms on push events
-    if: (!matrix.pr_only || github.event_name == 'pull_request')
 
     steps:
       - uses: actions/checkout@v4
