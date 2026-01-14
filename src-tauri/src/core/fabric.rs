@@ -89,7 +89,8 @@ pub struct InstalledFabricVersion {
 ///
 /// # Returns
 /// A list of game versions that have Fabric intermediary mappings available.
-pub async fn fetch_supported_game_versions() -> Result<Vec<FabricGameVersion>, Box<dyn Error + Send + Sync>> {
+pub async fn fetch_supported_game_versions(
+) -> Result<Vec<FabricGameVersion>, Box<dyn Error + Send + Sync>> {
     let url = format!("{}/versions/game", FABRIC_META_URL);
     let resp = reqwest::get(&url)
         .await?
@@ -102,7 +103,8 @@ pub async fn fetch_supported_game_versions() -> Result<Vec<FabricGameVersion>, B
 ///
 /// # Returns
 /// A list of all Fabric loader versions, ordered by build number (newest first).
-pub async fn fetch_loader_versions() -> Result<Vec<FabricLoaderVersion>, Box<dyn Error + Send + Sync>> {
+pub async fn fetch_loader_versions(
+) -> Result<Vec<FabricLoaderVersion>, Box<dyn Error + Send + Sync>> {
     let url = format!("{}/versions/loader", FABRIC_META_URL);
     let resp = reqwest::get(&url)
         .await?
@@ -145,7 +147,10 @@ pub async fn fetch_version_profile(
         "{}/versions/loader/{}/{}/profile/json",
         FABRIC_META_URL, game_version, loader_version
     );
-    let resp = reqwest::get(&url).await?.json::<serde_json::Value>().await?;
+    let resp = reqwest::get(&url)
+        .await?
+        .json::<serde_json::Value>()
+        .await?;
     Ok(resp)
 }
 

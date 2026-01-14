@@ -74,7 +74,7 @@ pub async fn fetch_vanilla_version(
 ) -> Result<GameVersion, Box<dyn Error + Send + Sync>> {
     // First, get the manifest to find the version URL
     let manifest = fetch_version_manifest().await?;
-    
+
     let version_entry = manifest
         .versions
         .iter()
@@ -86,7 +86,7 @@ pub async fn fetch_vanilla_version(
         .await?
         .json::<GameVersion>()
         .await?;
-    
+
     Ok(resp)
 }
 
@@ -121,7 +121,7 @@ pub async fn load_version(
             Ok(v) => v,
             Err(_) => fetch_vanilla_version(&parent_id).await?,
         };
-        
+
         // Merge child into parent
         version = crate::core::version_merge::merge_versions(version, parent);
     }

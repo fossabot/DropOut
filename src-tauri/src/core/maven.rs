@@ -101,7 +101,10 @@ impl MavenCoordinate {
             }
         };
 
-        format!("{}/{}/{}/{}", group_path, self.artifact, self.version, filename)
+        format!(
+            "{}/{}/{}/{}",
+            group_path, self.artifact, self.version, filename
+        )
     }
 
     /// Get the local file path for storing this artifact.
@@ -142,7 +145,11 @@ impl MavenCoordinate {
 ///
 /// # Returns
 /// The resolved download URL
-pub fn resolve_library_url(name: &str, explicit_url: Option<&str>, maven_url: Option<&str>) -> Option<String> {
+pub fn resolve_library_url(
+    name: &str,
+    explicit_url: Option<&str>,
+    maven_url: Option<&str>,
+) -> Option<String> {
     // If there's an explicit URL, use it
     if let Some(url) = explicit_url {
         return Some(url.to_string());
@@ -156,7 +163,9 @@ pub fn resolve_library_url(name: &str, explicit_url: Option<&str>, maven_url: Op
         // Guess the repository based on group
         if coord.group.starts_with("net.fabricmc") {
             FABRIC_MAVEN
-        } else if coord.group.starts_with("net.minecraftforge") || coord.group.starts_with("cpw.mods") {
+        } else if coord.group.starts_with("net.minecraftforge")
+            || coord.group.starts_with("cpw.mods")
+        {
             FORGE_MAVEN
         } else {
             MOJANG_LIBRARIES

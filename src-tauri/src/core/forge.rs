@@ -48,7 +48,7 @@ pub struct InstalledForgeVersion {
 /// A list of Minecraft version strings that have Forge available.
 pub async fn fetch_supported_game_versions() -> Result<Vec<String>, Box<dyn Error + Send + Sync>> {
     let promos = fetch_promotions().await?;
-    
+
     let mut versions: Vec<String> = promos
         .promos
         .keys()
@@ -62,12 +62,12 @@ pub async fn fetch_supported_game_versions() -> Result<Vec<String>, Box<dyn Erro
             }
         })
         .collect();
-    
+
     // Deduplicate and sort
     versions.sort();
     versions.dedup();
     versions.reverse(); // Newest first
-    
+
     Ok(versions)
 }
 
@@ -159,7 +159,7 @@ pub async fn install_forge(
     forge_version: &str,
 ) -> Result<InstalledForgeVersion, Box<dyn Error + Send + Sync>> {
     let version_id = generate_version_id(game_version, forge_version);
-    
+
     // Create basic version JSON structure
     // Note: This is a simplified version. Full Forge installation requires
     // downloading the installer and running processors.
@@ -206,7 +206,10 @@ fn create_forge_version_json(
             vec![
                 create_library_entry(&forge_maven_coord, Some(FORGE_MAVEN_URL)),
                 create_library_entry(
-                    &format!("net.minecraftforge:forge:{}-{}:universal", game_version, forge_version),
+                    &format!(
+                        "net.minecraftforge:forge:{}-{}:universal",
+                        game_version, forge_version
+                    ),
                     Some(FORGE_MAVEN_URL),
                 ),
             ],

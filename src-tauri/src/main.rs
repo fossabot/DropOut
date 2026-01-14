@@ -41,7 +41,7 @@ impl MsRefreshTokenState {
 }
 
 /// Check if a string contains unresolved placeholders in the form ${...}
-/// 
+///
 /// After the replacement phase, if a string still contains ${...}, it means
 /// that placeholder variable was not found in the replacements map and is
 /// therefore unresolved. We should skip adding such arguments to avoid
@@ -119,11 +119,11 @@ async fn start_game(
         window,
         format!("Loading version details for {}...", version_id)
     );
-    
+
     let version_details = core::manifest::load_version(&game_dir, &version_id)
         .await
         .map_err(|e| e.to_string())?;
-    
+
     emit_log!(
         window,
         format!(
@@ -145,7 +145,9 @@ async fn start_game(
 
     // --- Client Jar ---
     // Get downloads from version_details (may be inherited)
-    let downloads = version_details.downloads.as_ref()
+    let downloads = version_details
+        .downloads
+        .as_ref()
         .ok_or("Version has no downloads information")?;
     let client_jar = &downloads.client;
     let mut client_path = game_dir.join("versions");
@@ -222,12 +224,11 @@ async fn start_game(
             } else {
                 // 3. Library without explicit downloads (mod loader libraries)
                 // Use Maven coordinate resolution
-                if let Some(url) = core::maven::resolve_library_url(
-                    &lib.name,
-                    None,
-                    lib.url.as_deref(),
-                ) {
-                    if let Some(lib_path) = core::maven::get_library_path(&lib.name, &libraries_dir) {
+                if let Some(url) =
+                    core::maven::resolve_library_url(&lib.name, None, lib.url.as_deref())
+                {
+                    if let Some(lib_path) = core::maven::get_library_path(&lib.name, &libraries_dir)
+                    {
                         download_tasks.push(core::downloader::DownloadTask {
                             url,
                             path: lib_path,
@@ -246,7 +247,9 @@ async fn start_game(
     let indexes_dir = assets_dir.join("indexes");
 
     // Get asset index (may be inherited from parent)
-    let asset_index = version_details.asset_index.as_ref()
+    let asset_index = version_details
+        .asset_index
+        .as_ref()
         .ok_or("Version has no asset index information")?;
 
     // Download Asset Index JSON
@@ -262,10 +265,7 @@ async fn start_game(
             .await
             .map_err(|e| e.to_string())?
     } else {
-        println!(
-            "Downloading asset index from {}",
-            asset_index.url
-        );
+        println!("Downloading asset index from {}", asset_index.url);
         let content = reqwest::get(&asset_index.url)
             .await
             .map_err(|e| e.to_string())?
@@ -426,10 +426,7 @@ async fn start_game(
     replacements.insert("${version_name}", version_id.clone());
     replacements.insert("${game_directory}", game_dir.to_string_lossy().to_string());
     replacements.insert("${assets_root}", assets_dir.to_string_lossy().to_string());
-    replacements.insert(
-        "${assets_index_name}",
-        asset_index.id.clone(),
-    );
+    replacements.insert("${assets_index_name}", asset_index.id.clone());
     replacements.insert("${auth_uuid}", account.uuid());
     replacements.insert("${auth_access_token}", account.access_token());
     replacements.insert("${user_type}", "mojang".to_string());
