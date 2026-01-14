@@ -124,6 +124,14 @@ jobs:
           workspaces: "./src-tauri -> target"
           shared-key: ${{ matrix.target }}
 
+      - name: Setup appimagetool (Linux)
+        if: startsWith(matrix.platform, 'ubuntu')
+        run: |
+          ARCH=$(uname -m)
+          wget -q "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${ARCH}.AppImage"
+          chmod +x "appimagetool-${ARCH}.AppImage"
+          sudo mv "appimagetool-${ARCH}.AppImage" /usr/local/bin/appimagetool
+
       - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
         env:
@@ -131,3 +139,29 @@ jobs:
         with:
           releaseId: ${{ needs.promote-release.outputs.release_id }}
           args: ${{ matrix.args }}
+
+      - name: Fix AppImage for Wayland (Linux)
+        if: startsWith(matrix.platform, 'ubuntu')
+        run: |
+          # Locate the generated AppImage
+          APPIMAGE=$(find bundle -name "*.AppImage" -type f | head -1)
+          echo "Found AppImage: $APPIMAGE"
+
+          if [ -n "$APPIMAGE" ]; then
+            # backup original AppImage
+            cp "$APPIMAGE" "${APPIMAGE}.backup"
+
+            # extract AppImage
+            "$APPIMAGE" --appimage-extract
+
+            # Fix GTK hook, remove forced X11
+            if [ -f squashfs-root/apprun-hooks/linuxdeploy-plugin-gtk.sh ]; then
+              sed -i 's/^export GDK_BACKEND=x11.*$/# export GDK_BACKEND=x11  # Disabled for Wayland compatibility/' squashfs-root/apprun-hooks/linuxdeploy-plugin-gtk.sh
+              echo "Successfully patched GTK hook for Wayland compatibility"
+            fi
+
+            # Repack AppImage
+            appimagetool squashfs-root "$APPIMAGE"
+            rm -rf squashfs-root
+          fi
+        working-directory: src-tauri/target/release
