@@ -12,7 +12,7 @@ export class AuthState {
   msLoginLoading = $state(false);
   msLoginStatus = $state("Waiting for authorization...");
   
-  private pollInterval: any;
+  private pollInterval: ReturnType<typeof setInterval> | null = null;
   private isPollingRequestActive = false;
 
   async checkAccount() {
