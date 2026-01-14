@@ -1,9 +1,9 @@
-# DropOut - Next Generation Minecraft Launcher
+# DropOut
 
 DropOut is a modern, fast, and efficient Minecraft launcher built with the latest web and system technologies. It leverages **Tauri v2** to deliever a lightweight application with a robust **Rust** backend and a reactive **Svelte 5** frontend.
 
 <div align="center">
-   <img width="500" src="assets/image.jpg" />
+   <img width="700" src="assets/image.png" />
 </div>
 
 ## Features
@@ -13,16 +13,10 @@ DropOut is a modern, fast, and efficient Minecraft launcher built with the lates
 - **Cross-Platform**: Native support for **Windows**, **Linux**, and **macOS**.
 - **Modern UI**: Clean and responsive interface built with Svelte 5 and Tailwind CSS 4.
 - **Game Management**:
+
   - Version isolation and management
   - Efficient asset and library downloading
-  - Custom Java arguments support.
-
-## Supported Platforms
-
-- [X] **Linux** `x86_64`
-- [X] **macOS** `ARM64 (Apple Silicon)`
-- [X] **Windows** `x86_64`
-- [X] **Windows** `ARM64`
+  - Custom Java arguments support
 
 ## Roadmap
 
@@ -30,10 +24,10 @@ DropOut is a modern, fast, and efficient Minecraft launcher built with the lates
 - [X] **Token Refresh** — Auto-refresh expired Microsoft tokens
 - [X] **JVM Arguments Parsing** — Parse `arguments.jvm` from version.json for Mac M1/ARM support
 - [X] **Java Auto-detection** — Scan common paths for Java installations
-- [ ] **Fabric Loader Support** — Install and launch with Fabric
-- [ ] **Forge Loader Support** — Install and launch with Forge
+- [X] **Fabric Loader Support** — Install and launch with Fabric
+- [X] **Forge Loader Support** — Install and launch with Forge (basic support)
+- [X] **Version Filtering** — Filter by release/snapshot/modded in UI
 - [ ] **Instance/Profile System** — Multiple isolated game directories with different versions/mods
-- [ ] **Version Filtering** — Filter by release/snapshot/old_beta in UI
 - [ ] **Multi-account Support** — Switch between multiple accounts
 - [ ] **Custom Game Directory** — Allow users to choose game files location
 - [ ] **Launcher Auto-updater** — Self-update mechanism via Tauri updater plugin

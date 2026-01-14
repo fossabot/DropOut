@@ -26,12 +26,39 @@ pub struct MsRefreshTokenState {
     pub token: Mutex<Option<String>>,
 }
 
+impl Default for MsRefreshTokenState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MsRefreshTokenState {
     pub fn new() -> Self {
         Self {
             token: Mutex::new(None),
         }
     }
+}
+
+/// Check if a string contains unresolved placeholders in the form ${...}
+///
+/// After the replacement phase, if a string still contains ${...}, it means
+/// that placeholder variable was not found in the replacements map and is
+/// therefore unresolved. We should skip adding such arguments to avoid
+/// passing malformed arguments to the game launcher.
+fn has_unresolved_placeholder(s: &str) -> bool {
+    // Look for the opening sequence
+    if let Some(start_pos) = s.find("${") {
+        // Check if there's a closing brace after the opening sequence
+        if s[start_pos + 2..].find('}').is_some() {
+            // Found a complete ${...} pattern - this is an unresolved placeholder
+            return true;
+        }
+        // Found ${ but no closing } - also treat as unresolved/malformed
+        return true;
+    }
+    // No ${ found - the string is fully resolved
+    false
 }
 
 #[tauri::command]
@@ -41,7 +68,10 @@ async fn start_game(
     config_state: State<'_, core::config::ConfigState>,
     version_id: String,
 ) -> Result<String, String> {
-    emit_log!(window, format!("Starting game launch for version: {}", version_id));
+    emit_log!(
+        window,
+        format!("Starting game launch for version: {}", version_id)
+    );
 
     // Check for active account
     emit_log!(window, "Checking for active account...".to_string());
@@ -51,16 +81,22 @@ async fn start_game(
         .unwrap()
         .clone()
         .ok_or("No active account found. Please login first.")?;
-    
+
     let account_type = match &account {
         core::auth::Account::Offline(_) => "Offline",
         core::auth::Account::Microsoft(_) => "Microsoft",
     };
-    emit_log!(window, format!("Account found: {} ({})", account.username(), account_type));
+    emit_log!(
+        window,
+        format!("Account found: {} ({})", account.username(), account_type)
+    );
 
     let config = config_state.config.lock().unwrap().clone();
     emit_log!(window, format!("Java path: {}", config.java_path));
-    emit_log!(window, format!("Memory: {}MB - {}MB", config.min_memory, config.max_memory));
+    emit_log!(
+        window,
+        format!("Memory: {}MB - {}MB", config.min_memory, config.max_memory)
+    );
 
     // Get App Data Directory (e.g., ~/.local/share/com.dropout.launcher or similar)
     // The identifier is set in tauri.conf.json.
@@ -78,45 +114,50 @@ async fn start_game(
 
     emit_log!(window, format!("Game directory: {:?}", game_dir));
 
-    // 1. Fetch manifest to find the version URL
-    emit_log!(window, "Fetching version manifest...".to_string());
-    let manifest = core::manifest::fetch_version_manifest()
+    // 1. Load version (supports both vanilla and modded versions with inheritance)
+    emit_log!(
+        window,
+        format!("Loading version details for {}...", version_id)
+    );
+
+    let version_details = core::manifest::load_version(&game_dir, &version_id)
         .await
         .map_err(|e| e.to_string())?;
-    emit_log!(window, format!("Found {} versions in manifest", manifest.versions.len()));
 
-    // Find the version info
-    let version_info = manifest
-        .versions
-        .iter()
-        .find(|v| v.id == version_id)
-        .ok_or_else(|| format!("Version {} not found in manifest", version_id))?;
+    emit_log!(
+        window,
+        format!(
+            "Version details loaded: main class = {}",
+            version_details.main_class
+        )
+    );
 
-    // 2. Fetch specific version JSON (client.jar info)
-    emit_log!(window, format!("Fetching version details for {}...", version_id));
-    let version_url = &version_info.url;
-    let version_details: core::game_version::GameVersion = reqwest::get(version_url)
-        .await
-        .map_err(|e| e.to_string())?
-        .json()
-        .await
-        .map_err(|e| e.to_string())?;
-    emit_log!(window, format!("Version details loaded: main class = {}", version_details.main_class));
+    // Determine the actual minecraft version for client.jar
+    // (for modded versions, this is the parent vanilla version)
+    let minecraft_version = version_details
+        .inherits_from
+        .clone()
+        .unwrap_or_else(|| version_id.clone());
 
-    // 3. Prepare download tasks
+    // 2. Prepare download tasks
     emit_log!(window, "Preparing download tasks...".to_string());
     let mut download_tasks = Vec::new();
 
     // --- Client Jar ---
-    let client_jar = version_details.downloads.client;
+    // Get downloads from version_details (may be inherited)
+    let downloads = version_details
+        .downloads
+        .as_ref()
+        .ok_or("Version has no downloads information")?;
+    let client_jar = &downloads.client;
     let mut client_path = game_dir.join("versions");
-    client_path.push(&version_id);
-    client_path.push(format!("{}.jar", version_id));
+    client_path.push(&minecraft_version);
+    client_path.push(format!("{}.jar", minecraft_version));
 
     download_tasks.push(core::downloader::DownloadTask {
-        url: client_jar.url,
+        url: client_jar.url.clone(),
         path: client_path.clone(),
-        sha1: Some(client_jar.sha1),
+        sha1: client_jar.sha1.clone(),
         sha256: None,
     });
 
@@ -127,7 +168,7 @@ async fn start_game(
 
     for lib in &version_details.libraries {
         if core::rules::is_library_allowed(&lib.rules) {
-            // 1. Standard Library
+            // 1. Standard Library - check for explicit downloads first
             if let Some(downloads) = &lib.downloads {
                 if let Some(artifact) = &downloads.artifact {
                     let path_str = artifact
@@ -141,7 +182,7 @@ async fn start_game(
                     download_tasks.push(core::downloader::DownloadTask {
                         url: artifact.url.clone(),
                         path: lib_path,
-                        sha1: Some(artifact.sha1.clone()),
+                        sha1: artifact.sha1.clone(),
                         sha256: None,
                     });
                 }
@@ -175,12 +216,27 @@ async fn start_game(
                             download_tasks.push(core::downloader::DownloadTask {
                                 url: native_artifact.url,
                                 path: native_path.clone(),
-                                sha1: Some(native_artifact.sha1),
+                                sha1: native_artifact.sha1,
                                 sha256: None,
                             });
 
                             native_libs_paths.push(native_path);
                         }
+                    }
+                }
+            } else {
+                // 3. Library without explicit downloads (mod loader libraries)
+                // Use Maven coordinate resolution
+                if let Some(url) =
+                    core::maven::resolve_library_url(&lib.name, None, lib.url.as_deref())
+                {
+                    if let Some(lib_path) = core::maven::get_library_path(&lib.name, &libraries_dir)
+                    {
+                        download_tasks.push(core::downloader::DownloadTask {
+                            url,
+                            path: lib_path,
+                            sha1: None, // Maven libraries often don't have SHA1 in the JSON
+                        });
                     }
                 }
             }
@@ -193,8 +249,14 @@ async fn start_game(
     let objects_dir = assets_dir.join("objects");
     let indexes_dir = assets_dir.join("indexes");
 
+    // Get asset index (may be inherited from parent)
+    let asset_index = version_details
+        .asset_index
+        .as_ref()
+        .ok_or("Version has no asset index information")?;
+
     // Download Asset Index JSON
-    let asset_index_path = indexes_dir.join(format!("{}.json", version_details.asset_index.id));
+    let asset_index_path = indexes_dir.join(format!("{}.json", asset_index.id));
 
     // Check if index exists or download it
     // Note: We need the content of this file to parse it.
@@ -206,11 +268,8 @@ async fn start_game(
             .await
             .map_err(|e| e.to_string())?
     } else {
-        println!(
-            "Downloading asset index from {}",
-            version_details.asset_index.url
-        );
-        let content = reqwest::get(&version_details.asset_index.url)
+        println!("Downloading asset index from {}", asset_index.url);
+        let content = reqwest::get(&asset_index.url)
             .await
             .map_err(|e| e.to_string())?
             .text()
@@ -260,16 +319,29 @@ async fn start_game(
         });
     }
 
-    emit_log!(window, format!(
-        "Total download tasks: {} (Client + Libraries + Assets)",
-        download_tasks.len()
-    ));
+    emit_log!(
+        window,
+        format!(
+            "Total download tasks: {} (Client + Libraries + Assets)",
+            download_tasks.len()
+        )
+    );
 
     // 4. Start Download
-    emit_log!(window, "Starting downloads...".to_string());
-    core::downloader::download_files(window.clone(), download_tasks)
-        .await
-        .map_err(|e| e.to_string())?;
+    emit_log!(
+        window,
+        format!(
+            "Starting downloads with {} concurrent threads...",
+            config.download_threads
+        )
+    );
+    core::downloader::download_files(
+        window.clone(),
+        download_tasks,
+        config.download_threads as usize,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
     emit_log!(window, "All downloads completed successfully".to_string());
 
     // 5. Extract Natives
@@ -332,16 +404,16 @@ async fn start_game(
             parse_jvm_arguments(jvm_args, &mut args, &natives_path, &classpath);
         }
     }
-    
+
     // Add memory settings (these override any defaults)
     args.push(format!("-Xmx{}M", config.max_memory));
     args.push(format!("-Xms{}M", config.min_memory));
-    
+
     // Ensure natives path is set if not already in jvm args
     if !args.iter().any(|a| a.contains("-Djava.library.path")) {
         args.push(format!("-Djava.library.path={}", natives_path));
     }
-    
+
     // Ensure classpath is set if not already
     if !args.iter().any(|a| a == "-cp" || a == "-classpath") {
         args.push("-cp".to_string());
@@ -358,10 +430,7 @@ async fn start_game(
     replacements.insert("${version_name}", version_id.clone());
     replacements.insert("${game_directory}", game_dir.to_string_lossy().to_string());
     replacements.insert("${assets_root}", assets_dir.to_string_lossy().to_string());
-    replacements.insert(
-        "${assets_index_name}",
-        version_details.asset_index.id.clone(),
-    );
+    replacements.insert("${assets_index_name}", asset_index.id.clone());
     replacements.insert("${auth_uuid}", account.uuid());
     replacements.insert("${auth_access_token}", account.access_token());
     replacements.insert("${user_type}", "mojang".to_string());
@@ -413,7 +482,10 @@ async fn start_game(
                                     for (key, replacement) in &replacements {
                                         arg = arg.replace(key, replacement);
                                     }
-                                    args.push(arg);
+                                    // Skip arguments with unresolved placeholders
+                                    if !has_unresolved_placeholder(&arg) {
+                                        args.push(arg);
+                                    }
                                 } else if let Some(arr) = val.as_array() {
                                     for sub in arr {
                                         if let Some(s) = sub.as_str() {
@@ -421,7 +493,10 @@ async fn start_game(
                                             for (key, replacement) in &replacements {
                                                 arg = arg.replace(key, replacement);
                                             }
-                                            args.push(arg);
+                                            // Skip arguments with unresolved placeholders
+                                            if !has_unresolved_placeholder(&arg) {
+                                                args.push(arg);
+                                            }
                                         }
                                     }
                                 }
@@ -433,14 +508,20 @@ async fn start_game(
         }
     }
 
-    emit_log!(window, format!("Preparing to launch game with {} arguments...", args.len()));
+    emit_log!(
+        window,
+        format!("Preparing to launch game with {} arguments...", args.len())
+    );
     // Debug: Log arguments (only first few to avoid spam)
     if args.len() > 10 {
         emit_log!(window, format!("First 10 args: {:?}", &args[..10]));
     }
 
     // Spawn the process
-    emit_log!(window, format!("Starting Java process: {}", config.java_path));
+    emit_log!(
+        window,
+        format!("Starting Java process: {}", config.java_path)
+    );
     let mut command = Command::new(&config.java_path);
     command.args(&args);
     command.current_dir(&game_dir); // Run in game directory
@@ -452,7 +533,10 @@ async fn start_game(
     {
         const CREATE_NO_WINDOW: u32 = 0x08000000;
         command.creation_flags(CREATE_NO_WINDOW);
-        emit_log!(window, "Applied CREATE_NO_WINDOW flag for Windows".to_string());
+        emit_log!(
+            window,
+            "Applied CREATE_NO_WINDOW flag for Windows".to_string()
+        );
     }
 
     // Spawn and handle output
@@ -472,7 +556,10 @@ async fn start_game(
         .expect("child did not have a handle to stderr");
 
     // Emit launcher log that game is running
-    emit_log!(window, "Game is now running, capturing output...".to_string());
+    emit_log!(
+        window,
+        "Game is now running, capturing output...".to_string()
+    );
 
     let window_rx = window.clone();
     tokio::spawn(async move {
@@ -541,9 +628,9 @@ fn parse_jvm_arguments(
             } else if let Some(obj) = item.as_object() {
                 // Conditional argument with rules
                 let allow = if let Some(rules_val) = obj.get("rules") {
-                    if let Ok(rules) = serde_json::from_value::<Vec<core::game_version::Rule>>(
-                        rules_val.clone(),
-                    ) {
+                    if let Ok(rules) =
+                        serde_json::from_value::<Vec<core::game_version::Rule>>(rules_val.clone())
+                    {
                         core::rules::is_library_allowed(&Some(rules))
                     } else {
                         false
@@ -600,13 +687,16 @@ async fn login_offline(
     let account = core::auth::Account::Offline(core::auth::OfflineAccount { username, uuid });
 
     *state.active_account.lock().unwrap() = Some(account.clone());
-    
+
     // Save to storage
     let app_handle = window.app_handle();
-    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let app_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?;
     let storage = core::account_storage::AccountStorage::new(app_dir);
     storage.add_or_update_account(&account, None)?;
-    
+
     Ok(account)
 }
 
@@ -618,23 +708,28 @@ async fn get_active_account(
 }
 
 #[tauri::command]
-async fn logout(
-    window: Window,
-    state: State<'_, core::auth::AccountState>,
-) -> Result<(), String> {
+async fn logout(window: Window, state: State<'_, core::auth::AccountState>) -> Result<(), String> {
     // Get current account UUID before clearing
-    let uuid = state.active_account.lock().unwrap().as_ref().map(|a| a.uuid());
-    
+    let uuid = state
+        .active_account
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map(|a| a.uuid());
+
     *state.active_account.lock().unwrap() = None;
-    
+
     // Remove from storage
     if let Some(uuid) = uuid {
         let app_handle = window.app_handle();
-        let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+        let app_dir = app_handle
+            .path()
+            .app_data_dir()
+            .map_err(|e| e.to_string())?;
         let storage = core::account_storage::AccountStorage::new(app_dir);
         storage.remove_account(&uuid)?;
     }
-    
+
     Ok(())
 }
 
@@ -669,23 +764,23 @@ async fn complete_microsoft_login(
 ) -> Result<core::auth::Account, String> {
     // 1. Poll (once) for token
     let token_resp = core::auth::exchange_code_for_token(&device_code).await?;
-    
+
     // Store MS refresh token
     let ms_refresh_token = token_resp.refresh_token.clone();
     *ms_refresh_state.token.lock().unwrap() = ms_refresh_token.clone();
-    
+
     // 2. Xbox Live Auth
     let (xbl_token, uhs) = core::auth::method_xbox_live(&token_resp.access_token).await?;
-    
+
     // 3. XSTS Auth
     let xsts_token = core::auth::method_xsts(&xbl_token).await?;
-    
+
     // 4. Minecraft Auth
     let mc_token = core::auth::login_minecraft(&xsts_token, &uhs).await?;
-    
+
     // 5. Get Profile
     let profile = core::auth::fetch_profile(&mc_token).await?;
-    
+
     // 6. Create Account
     let account = core::auth::Account::Microsoft(core::auth::MicrosoftAccount {
         username: profile.name,
@@ -695,18 +790,22 @@ async fn complete_microsoft_login(
         expires_at: (std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
-            .as_secs() + token_resp.expires_in) as i64,
+            .as_secs()
+            + token_resp.expires_in) as i64,
     });
-    
+
     // 7. Save to state
     *state.active_account.lock().unwrap() = Some(account.clone());
-    
+
     // 8. Save to storage
     let app_handle = window.app_handle();
-    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let app_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?;
     let storage = core::account_storage::AccountStorage::new(app_dir);
     storage.add_or_update_account(&account, ms_refresh_token)?;
-    
+
     Ok(account)
 }
 
@@ -719,26 +818,29 @@ async fn refresh_account(
 ) -> Result<core::auth::Account, String> {
     // Get stored MS refresh token
     let app_handle = window.app_handle();
-    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let app_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?;
     let storage = core::account_storage::AccountStorage::new(app_dir.clone());
-    
+
     let (stored_account, ms_refresh) = storage
         .get_active_account()
         .ok_or("No active account found")?;
-    
+
     let ms_refresh_token = ms_refresh.ok_or("No refresh token available")?;
-    
+
     // Perform full refresh
     let (new_account, new_ms_refresh) = core::auth::refresh_full_auth(&ms_refresh_token).await?;
     let account = core::auth::Account::Microsoft(new_account);
-    
+
     // Update state
     *state.active_account.lock().unwrap() = Some(account.clone());
     *ms_refresh_state.token.lock().unwrap() = Some(new_ms_refresh.clone());
-    
+
     // Update storage
     storage.add_or_update_account(&account, Some(new_ms_refresh))?;
-    
+
     Ok(account)
 }
 
@@ -790,33 +892,178 @@ async fn fetch_available_java_versions() -> Result<Vec<u32>, String> {
     core::java::fetch_available_versions().await
 }
 
+/// Get Minecraft versions supported by Fabric
+#[tauri::command]
+async fn get_fabric_game_versions() -> Result<Vec<core::fabric::FabricGameVersion>, String> {
+    core::fabric::fetch_supported_game_versions()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Get available Fabric loader versions
+#[tauri::command]
+async fn get_fabric_loader_versions() -> Result<Vec<core::fabric::FabricLoaderVersion>, String> {
+    core::fabric::fetch_loader_versions()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Get Fabric loaders available for a specific Minecraft version
+#[tauri::command]
+async fn get_fabric_loaders_for_version(
+    game_version: String,
+) -> Result<Vec<core::fabric::FabricLoaderEntry>, String> {
+    core::fabric::fetch_loaders_for_game_version(&game_version)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Install Fabric loader for a specific Minecraft version
+#[tauri::command]
+async fn install_fabric(
+    window: Window,
+    game_version: String,
+    loader_version: String,
+) -> Result<core::fabric::InstalledFabricVersion, String> {
+    emit_log!(
+        window,
+        format!(
+            "Installing Fabric {} for Minecraft {}...",
+            loader_version, game_version
+        )
+    );
+
+    let app_handle = window.app_handle();
+    let game_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+
+    let result = core::fabric::install_fabric(&game_dir, &game_version, &loader_version)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    emit_log!(
+        window,
+        format!("Fabric installed successfully: {}", result.id)
+    );
+
+    Ok(result)
+}
+
+/// List installed Fabric versions
+#[tauri::command]
+async fn list_installed_fabric_versions(window: Window) -> Result<Vec<String>, String> {
+    let app_handle = window.app_handle();
+    let game_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+
+    core::fabric::list_installed_fabric_versions(&game_dir)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Check if Fabric is installed for a specific version
+#[tauri::command]
+async fn is_fabric_installed(
+    window: Window,
+    game_version: String,
+    loader_version: String,
+) -> Result<bool, String> {
+    let app_handle = window.app_handle();
+    let game_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+
+    Ok(core::fabric::is_fabric_installed(
+        &game_dir,
+        &game_version,
+        &loader_version,
+    ))
+}
+
+/// Get Minecraft versions supported by Forge
+#[tauri::command]
+async fn get_forge_game_versions() -> Result<Vec<String>, String> {
+    core::forge::fetch_supported_game_versions()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Get available Forge versions for a specific Minecraft version
+#[tauri::command]
+async fn get_forge_versions_for_game(
+    game_version: String,
+) -> Result<Vec<core::forge::ForgeVersion>, String> {
+    core::forge::fetch_forge_versions(&game_version)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Install Forge for a specific Minecraft version
+#[tauri::command]
+async fn install_forge(
+    window: Window,
+    game_version: String,
+    forge_version: String,
+) -> Result<core::forge::InstalledForgeVersion, String> {
+    emit_log!(
+        window,
+        format!(
+            "Installing Forge {} for Minecraft {}...",
+            forge_version, game_version
+        )
+    );
+
+    let app_handle = window.app_handle();
+    let game_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+
+    let result = core::forge::install_forge(&game_dir, &game_version, &forge_version)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    emit_log!(
+        window,
+        format!("Forge installed successfully: {}", result.id)
+    );
+
+    Ok(result)
+}
+
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .manage(core::auth::AccountState::new())
         .manage(MsRefreshTokenState::new())
         .setup(|app| {
             let config_state = core::config::ConfigState::new(app.handle());
             app.manage(config_state);
-            
+
             // Load saved account on startup
             let app_dir = app.path().app_data_dir().unwrap();
             let storage = core::account_storage::AccountStorage::new(app_dir);
-            
+
             if let Some((stored_account, ms_refresh)) = storage.get_active_account() {
                 let account = stored_account.to_account();
                 let auth_state: State<core::auth::AccountState> = app.state();
                 *auth_state.active_account.lock().unwrap() = Some(account);
-                
+
                 // Store MS refresh token
                 if let Some(token) = ms_refresh {
                     let ms_state: State<MsRefreshTokenState> = app.state();
                     *ms_state.token.lock().unwrap() = Some(token);
                 }
-                
+
                 println!("[Startup] Loaded saved account");
             }
-            
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -834,7 +1081,18 @@ fn main() {
             get_recommended_java,
             fetch_adoptium_java,
             download_adoptium_java,
-            fetch_available_java_versions
+            fetch_available_java_versions,
+            // Fabric commands
+            get_fabric_game_versions,
+            get_fabric_loader_versions,
+            get_fabric_loaders_for_version,
+            install_fabric,
+            list_installed_fabric_versions,
+            is_fabric_installed,
+            // Forge commands
+            get_forge_game_versions,
+            get_forge_versions_for_game,
+            install_forge
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
