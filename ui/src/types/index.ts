@@ -34,6 +34,7 @@ export interface LauncherConfig {
   enable_gpu_acceleration: boolean;
   enable_visual_effects: boolean;
   active_effect: string;
+  theme: string;
 }
 
 export interface JavaInstallation {

@@ -13,6 +13,7 @@ export class SettingsState {
     enable_gpu_acceleration: false,
     enable_visual_effects: true,
     active_effect: "constellation",
+    theme: "dark",
   });
   javaInstallations = $state<JavaInstallation[]>([]);
   isDetectingJava = $state(false);
@@ -21,6 +22,11 @@ export class SettingsState {
     try {
       const result = await invoke<LauncherConfig>("get_settings");
       this.settings = result;
+      // Force dark mode
+      if (this.settings.theme !== "dark") {
+          this.settings.theme = "dark";
+          this.saveSettings();
+      }
     } catch (e) {
       console.error("Failed to load settings:", e);
     }

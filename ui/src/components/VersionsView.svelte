@@ -73,15 +73,15 @@
   function getVersionBadge(type: string) {
     switch (type) {
       case "release":
-        return { text: "Release", class: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" };
+        return { text: "Release", class: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30" };
       case "snapshot":
-        return { text: "Snapshot", class: "bg-amber-500/20 text-amber-300 border-amber-500/30" };
+        return { text: "Snapshot", class: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/30" };
       case "fabric":
-        return { text: "Fabric", class: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30" };
+        return { text: "Fabric", class: "bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:border-indigo-500/30" };
       case "forge":
-        return { text: "Forge", class: "bg-orange-500/20 text-orange-300 border-orange-500/30" };
+        return { text: "Forge", class: "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-500/20 dark:text-orange-300 dark:border-orange-500/30" };
       default:
-        return { text: type, class: "bg-zinc-500/20 text-zinc-300 border-zinc-500/30" };
+        return { text: type, class: "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-500/20 dark:text-zinc-300 dark:border-zinc-500/30" };
     }
   }
 
@@ -116,8 +116,8 @@
 
 <div class="h-full flex flex-col p-6 overflow-hidden">
   <div class="flex items-center justify-between mb-6">
-     <h2 class="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">Version Manager</h2>
-     <div class="text-sm text-white/40">Select a version to play or modify</div>
+     <h2 class="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-white/60">Version Manager</h2>
+     <div class="text-sm dark:text-white/40 text-black/50">Select a version to play or modify</div>
   </div>
 
   <div class="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
@@ -126,24 +126,24 @@
       <!-- Search and Filters (Glass Bar) -->
       <div class="flex gap-3">
         <div class="relative flex-1">
-            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-white/30">🔍</span>
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 dark:text-white/30 text-black/30">🔍</span>
             <input
               type="text"
               placeholder="Search versions..."
-              class="w-full pl-9 pr-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-indigo-500/50 focus:bg-black/40 transition-all backdrop-blur-sm"
+              class="w-full pl-9 pr-4 py-3 bg-white/60 dark:bg-black/20 border border-black/10 dark:border-white/10 rounded-xl dark:text-white text-gray-900 placeholder-black/30 dark:placeholder-white/30 focus:outline-none focus:border-indigo-500/50 dark:focus:bg-black/40 focus:bg-white/80 transition-all backdrop-blur-sm"
               bind:value={searchQuery}
             />
         </div>
       </div>
 
       <!-- Type Filter Tabs (Glass Caps) -->
-      <div class="flex p-1 bg-black/20 rounded-xl border border-white/5">
+      <div class="flex p-1 bg-white/60 dark:bg-black/20 rounded-xl border border-black/5 dark:border-white/5">
         {#each ['all', 'release', 'snapshot', 'modded'] as filter}
             <button
             class="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 capitalize
             {typeFilter === filter
-                ? 'bg-white/10 text-white shadow-lg border border-white/10'
-                : 'text-white/40 hover:text-white hover:bg-white/5'}"
+                ? 'bg-white shadow-sm border border-black/5 dark:bg-white/10 dark:text-white dark:shadow-lg dark:border-white/10 text-black'
+                : 'text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}"
             onclick={() => (typeFilter = filter as any)}
             >
             {filter}
@@ -154,11 +154,11 @@
       <!-- Version List SCROLL -->
       <div class="flex-1 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
         {#if gameState.versions.length === 0}
-          <div class="flex items-center justify-center h-40 text-white/30 italic animate-pulse">
+          <div class="flex items-center justify-center h-40 dark:text-white/30 text-black/30 italic animate-pulse">
              Fetching manifest...
           </div>
         {:else if filteredVersions().length === 0}
-          <div class="flex flex-col items-center justify-center -40 text-white/30 gap-2">
+          <div class="flex flex-col items-center justify-center -40 dark:text-white/30 text-black/30 gap-2">
              <span class="text-2xl">👻</span>
              <span>No matching versions found</span>
           </div>
@@ -169,8 +169,8 @@
             <button
               class="w-full group flex items-center justify-between p-4 rounded-xl text-left border transition-all duration-200 relative overflow-hidden
               {isSelected
-                ? 'bg-indigo-600/20 border-indigo-500/50 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
-                : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10 hover:translate-x-1'}"
+                ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-600/20 dark:border-indigo-500/50 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
+                : 'bg-white/40 dark:bg-white/5 border-black/5 dark:border-white/5 hover:bg-white/60 dark:hover:bg-white/10 hover:border-black/10 dark:hover:border-white/10 hover:translate-x-1'}"
               onclick={() => (gameState.selectedVersion = version.id)}
             >
               <!-- Selection Glow -->
@@ -185,11 +185,11 @@
                   {badge.text}
                 </span>
                 <div>
-                  <div class="font-bold font-mono text-lg tracking-tight {isSelected ? 'text-white' : 'text-zinc-300 group-hover:text-white'}">
+                  <div class="font-bold font-mono text-lg tracking-tight {isSelected ? 'text-black dark:text-white' : 'text-gray-700 dark:text-zinc-300 group-hover:text-black dark:group-hover:text-white'}">
                     {version.id}
                   </div>
                   {#if version.releaseTime && version.type !== "fabric" && version.type !== "forge"}
-                    <div class="text-xs text-white/30">
+                    <div class="text-xs dark:text-white/30 text-black/30">
                       {new Date(version.releaseTime).toLocaleDateString()}
                     </div>
                   {/if}
@@ -197,7 +197,7 @@
               </div>
               
               {#if isSelected}
-                <div class="relative z-10 text-indigo-400">
+                <div class="relative z-10 text-indigo-500 dark:text-indigo-400">
                    <span class="text-lg">Selected</span>
                 </div>
               {/if}
@@ -210,21 +210,21 @@
     <!-- Right: Mod Loader Panel -->
     <div class="flex flex-col gap-4">
       <!-- Selected Version Info Card -->
-      <div class="bg-gradient-to-br from-white/10 to-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-md relative overflow-hidden group">
+      <div class="bg-gradient-to-br from-white/40 to-white/20 dark:from-white/10 dark:to-white/5 p-6 rounded-2xl border border-black/5 dark:border-white/10 backdrop-blur-md relative overflow-hidden group">
           <div class="absolute top-0 right-0 p-8 bg-indigo-500/20 blur-[60px] rounded-full group-hover:bg-indigo-500/30 transition-colors"></div>
           
-          <h3 class="text-xs font-bold uppercase tracking-widest text-white/40 mb-2 relative z-10">Current Selection</h3>
+          <h3 class="text-xs font-bold uppercase tracking-widest dark:text-white/40 text-black/40 mb-2 relative z-10">Current Selection</h3>
           {#if gameState.selectedVersion}
-            <p class="font-mono text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-white/70 relative z-10 truncate">
+            <p class="font-mono text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-white/70 relative z-10 truncate">
                 {gameState.selectedVersion}
             </p>
           {:else}
-            <p class="text-white/20 italic relative z-10">None selected</p>
+            <p class="dark:text-white/20 text-black/20 italic relative z-10">None selected</p>
           {/if}
       </div>
 
       <!-- Mod Loader Selector Card -->
-      <div class="bg-black/20 p-4 rounded-2xl border border-white/5 backdrop-blur-sm flex-1 flex flex-col">
+      <div class="bg-white/60 dark:bg-black/20 p-4 rounded-2xl border border-black/5 dark:border-white/5 backdrop-blur-sm flex-1 flex flex-col">
           <ModLoaderSelector
             selectedGameVersion={selectedBaseVersion()}
             onInstall={handleModLoaderInstall}

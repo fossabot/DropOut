@@ -3,7 +3,7 @@
 </script>
 
 <aside
-  class="w-20 lg:w-64 bg-black flex flex-col items-center lg:items-start transition-all duration-300 shrink-0 py-6"
+  class="w-20 lg:w-64 dark:bg-black bg-white/80 border-r dark:border-white/5 border-gray-200/50 flex flex-col items-center lg:items-start transition-all duration-300 shrink-0 py-6 backdrop-blur-md"
 >
   <!-- Logo Area -->
   <div
@@ -17,7 +17,7 @@
     </div>
     <!-- Full Logo (Large) -->
     <div
-      class="hidden lg:block font-bold text-2xl tracking-wider text-white"
+      class="hidden lg:block font-bold text-2xl tracking-wider dark:text-white text-gray-900"
     >
       <span class="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-fuchsia-400">DROP</span>OUT
     </div>
@@ -30,8 +30,8 @@
       <button
         class="group flex items-center lg:gap-4 justify-center lg:justify-start w-full px-0 lg:px-5 py-3.5 rounded-xl transition-all duration-200 relative overflow-hidden
         {uiState.currentView === view
-          ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-white shadow-lg shadow-indigo-500/10 border border-white/10'
-          : 'text-zinc-400 hover:text-white hover:bg-white/5'}"
+          ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 dark:text-white text-indigo-900 shadow-lg shadow-indigo-500/10 dark:border border-white/10'
+          : 'dark:text-zinc-400 text-gray-500 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}"
         onclick={() => uiState.setView(view)}
       >
         <span class="text-xl relative z-10 transition-transform group-hover:scale-110 duration-200">{icon}</span>

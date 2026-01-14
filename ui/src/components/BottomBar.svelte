@@ -5,7 +5,7 @@
 </script>
 
 <div
-  class="h-24 bg-gradient-to-t from-black/50 to-transparent border-t border-white/5 flex items-center px-8 justify-between z-20 backdrop-blur-md"
+  class="h-24 bg-gradient-to-t from-black/50 to-transparent dark:from-black/50 dark:to-transparent from-white/90 to-transparent border-t dark:border-white/5 border-black/5 flex items-center px-8 justify-between z-20 backdrop-blur-md"
 >
   <!-- Account Area -->
   <div class="flex items-center gap-6">
@@ -17,7 +17,7 @@
       onkeydown={(e) => e.key === "Enter" && authState.openLoginModal()}
     >
       <div
-        class="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 shadow-lg shadow-indigo-500/20 flex items-center justify-center text-white font-bold text-xl overflow-hidden ring-2 ring-transparent group-hover:ring-white/20 transition-all"
+        class="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 shadow-lg shadow-indigo-500/20 flex items-center justify-center text-white font-bold text-xl overflow-hidden ring-2 ring-transparent dark:group-hover:ring-white/20 group-hover:ring-black/10 transition-all"
       >
         {#if authState.currentAccount}
           <img
@@ -30,25 +30,25 @@
         {/if}
       </div>
       <div>
-        <div class="font-bold text-white text-lg group-hover:text-indigo-300 transition-colors">
+        <div class="font-bold dark:text-white text-gray-900 text-lg group-hover:text-indigo-500 dark:group-hover:text-indigo-300 transition-colors">
           {authState.currentAccount ? authState.currentAccount.username : "Login"}
         </div>
-        <div class="text-xs text-zinc-400 flex items-center gap-1.5">
+        <div class="text-xs dark:text-zinc-400 text-gray-500 flex items-center gap-1.5">
           <span
             class="w-2 h-2 rounded-full {authState.currentAccount
               ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
-              : 'bg-zinc-600'}"
+              : 'dark:bg-zinc-600 bg-gray-400'}"
           ></span>
           {authState.currentAccount ? "Ready to play" : "Guest Mode"}
         </div>
       </div>
     </div>
     
-    <div class="h-8 w-px bg-white/10"></div>
+    <div class="h-8 w-px dark:bg-white/10 bg-black/10"></div>
     
     <!-- Console Toggle -->
     <button
-      class="text-xs font-mono text-zinc-500 hover:text-white transition-colors flex items-center gap-2"
+      class="text-xs font-mono dark:text-zinc-500 text-gray-500 dark:hover:text-white hover:text-black transition-colors flex items-center gap-2"
       onclick={() => uiState.toggleConsole()}
     >
       <span class="text-lg">_</span>
@@ -61,14 +61,14 @@
     <div class="flex flex-col items-end mr-2">
       <label
         for="version-select"
-        class="text-[10px] text-white/40 mb-1 uppercase font-bold tracking-wider"
+        class="text-[10px] dark:text-white/40 text-black/40 mb-1 uppercase font-bold tracking-wider"
         >Selected Version</label
       >
       <div class="relative group">
         <select
           id="version-select"
           bind:value={gameState.selectedVersion}
-          class="appearance-none bg-black/40 text-white border border-white/10 rounded-xl pl-4 pr-10 py-2.5 hover:border-white/30 transition-all cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500/50 w-56 text-sm font-mono backdrop-blur-sm shadow-inner"
+          class="appearance-none dark:bg-black/40 bg-white/60 dark:text-white text-gray-900 border dark:border-white/10 border-black/10 rounded-xl pl-4 pr-10 py-2.5 dark:hover:border-white/30 hover:border-black/30 transition-all cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500/50 w-56 text-sm font-mono backdrop-blur-sm shadow-inner"
         >
           {#if gameState.versions.length === 0}
             <option>Loading...</option>
@@ -78,7 +78,7 @@
             {/each}
           {/if}
         </select>
-        <div class="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none group-hover:text-white/50 transition-colors">▼</div>
+        <div class="absolute right-3 top-1/2 -translate-y-1/2 dark:text-white/20 text-black/20 pointer-events-none dark:group-hover:text-white/50 group-hover:text-black/50 transition-colors">▼</div>
       </div>
     </div>
 

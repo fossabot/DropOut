@@ -114,16 +114,16 @@
 
 <div class="space-y-4">
   <div class="flex items-center justify-between">
-      <h3 class="text-xs font-bold uppercase tracking-widest text-white/40">Select Mod Loader</h3>
+      <h3 class="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-white/40">Select Mod Loader</h3>
   </div>
 
   <!-- Loader Type Tabs - Segmented Control -->
-  <div class="flex p-1 bg-black/40 rounded-xl border border-white/5 backdrop-blur-sm">
+  <div class="flex p-1 bg-white/60 dark:bg-black/40 rounded-xl border border-black/5 dark:border-white/5 backdrop-blur-sm">
     <button
       class="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200
       {selectedLoader === 'vanilla'
-        ? 'bg-white/10 text-white shadow-lg border border-white/10'
-        : 'text-zinc-500 hover:text-white hover:bg-white/5'}"
+        ? 'bg-white shadow-lg border border-black/5 text-black dark:bg-white/10 dark:text-white dark:border-white/10'
+        : 'text-gray-500 dark:text-zinc-500 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}"
       onclick={() => onLoaderChange("vanilla")}
     >
       Vanilla
@@ -131,8 +131,8 @@
     <button
       class="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200
       {selectedLoader === 'fabric'
-        ? 'bg-indigo-500/20 text-indigo-300 shadow-lg border border-indigo-500/20'
-        : 'text-zinc-500 hover:text-white hover:bg-white/5'}"
+        ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:shadow-lg dark:border-indigo-500/20'
+        : 'text-gray-500 dark:text-zinc-500 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}"
       onclick={() => onLoaderChange("fabric")}
     >
       Fabric
@@ -140,8 +140,8 @@
     <button
       class="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200
       {selectedLoader === 'forge'
-        ? 'bg-orange-500/20 text-orange-300 shadow-lg border border-orange-500/20'
-        : 'text-zinc-500 hover:text-white hover:bg-white/5'}"
+        ? 'bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-500/20 dark:text-orange-300 dark:shadow-lg dark:border-orange-500/20'
+        : 'text-gray-500 dark:text-zinc-500 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}"
       onclick={() => onLoaderChange("forge")}
     >
       Forge
@@ -151,36 +151,36 @@
   <!-- Content Area -->
   <div class="min-h-[100px] flex flex-col justify-center">
     {#if selectedLoader === "vanilla"}
-        <div class="text-center p-4 rounded-xl bg-white/5 border border-dashed border-white/10 text-white/40 text-sm">
+        <div class="text-center p-4 rounded-xl bg-white/40 dark:bg-white/5 border border-dashed border-black/5 dark:border-white/10 text-gray-500 dark:text-white/40 text-sm">
            No mod loader selected. <br> Pure vanilla experience.
         </div>
         
     {:else if !selectedGameVersion}
-        <div class="text-center p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
+        <div class="text-center p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-300 text-sm">
            ⚠️ Please select a base Minecraft version first.
         </div>
         
     {:else if isLoading}
-        <div class="flex flex-col items-center gap-2 text-sm text-white/50 py-4">
-            <div class="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+        <div class="flex flex-col items-center gap-2 text-sm text-gray-500 dark:text-white/50 py-4">
+            <div class="w-6 h-6 border-2 border-gray-200 border-t-gray-500 dark:border-white/20 dark:border-t-white rounded-full animate-spin"></div>
             Loading {selectedLoader} versions...
         </div>
         
     {:else if error}
-        <div class="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300 text-sm break-words">
+        <div class="p-4 bg-red-50 border border-red-200 text-red-700 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-300 rounded-xl text-sm break-words">
             {error}
         </div>
         
     {:else if selectedLoader === "fabric"}
         <div class="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
         <div>
-            <label for="fabric-loader-select" class="block text-xs text-white/40 mb-2 pl-1"
+            <label for="fabric-loader-select" class="block text-xs text-gray-500 dark:text-white/40 mb-2 pl-1"
             >Loader Version</label
             >
             <div class="relative">
                 <select
                 id="fabric-loader-select"
-                class="w-full appearance-none bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500/50 text-white transition-colors"
+                class="w-full appearance-none bg-white/80 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500/50 text-gray-900 dark:text-white transition-colors"
                 bind:value={selectedFabricLoader}
                 >
                 {#each fabricLoaders as loader}
@@ -189,7 +189,7 @@
                     </option>
                 {/each}
                 </select>
-                <div class="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none">▼</div>
+                <div class="absolute right-4 top-1/2 -translate-y-1/2 text-black/30 dark:text-white/20 pointer-events-none">▼</div>
             </div>
         </div>
         
@@ -205,18 +205,18 @@
     {:else if selectedLoader === "forge"}
         <div class="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
         {#if forgeVersions.length === 0}
-            <div class="text-center p-4 text-sm text-white/40 italic">
+            <div class="text-center p-4 text-sm text-gray-500 dark:text-white/40 italic">
             No Forge versions available for {selectedGameVersion}
             </div>
         {:else}
             <div>
-            <label for="forge-version-select" class="block text-xs text-white/40 mb-2 pl-1"
+            <label for="forge-version-select" class="block text-xs text-gray-500 dark:text-white/40 mb-2 pl-1"
                 >Forge Version</label
             >
             <div class="relative">
                 <select
                     id="forge-version-select"
-                    class="w-full appearance-none bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-orange-500/50 text-white transition-colors"
+                    class="w-full appearance-none bg-white/80 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-orange-500/50 text-gray-900 dark:text-white transition-colors"
                     bind:value={selectedForgeVersion}
                 >
                     {#each forgeVersions as version}
@@ -227,7 +227,7 @@
                     </option>
                     {/each}
                 </select>
-                <div class="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none">▼</div>
+                <div class="absolute right-4 top-1/2 -translate-y-1/2 text-black/30 dark:text-white/20 pointer-events-none">▼</div>
             </div>
             </div>
             

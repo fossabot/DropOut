@@ -854,8 +854,6 @@ async fn get_recommended_java(
     Ok(core::java::get_recommended_java(required_major_version))
 }
 
-// ==================== Fabric Loader Commands ====================
-
 /// Get Minecraft versions supported by Fabric
 #[tauri::command]
 async fn get_fabric_game_versions() -> Result<Vec<core::fabric::FabricGameVersion>, String> {
@@ -948,8 +946,6 @@ async fn is_fabric_installed(
         &loader_version,
     ))
 }
-
-// ==================== Forge Loader Commands ====================
 
 /// Get Minecraft versions supported by Forge
 #[tauri::command]

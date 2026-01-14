@@ -19,19 +19,19 @@
     style:transform={`perspective(1000px) rotateX(${mouseY * -2}deg) rotateY(${mouseX * 2}deg)`}
   >
     <h1
-      class="text-8xl font-black tracking-tighter text-white drop-shadow-2xl mb-4"
-      style="text-shadow: 0 10px 30px rgba(0,0,0,0.5);"
+      class="text-8xl font-black tracking-tighter dark:text-white text-gray-900 drop-shadow-2xl mb-4"
+      style:text-shadow="0 10px 30px rgba(0,0,0,0.5)"
     >
       MINECRAFT
     </h1>
     
     <div class="flex items-center gap-4">
       <div 
-        class="bg-white/10 backdrop-blur-md border border-white/10 px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-widest text-emerald-400 shadow-xl"
+        class="bg-white/10 dark:bg-white/10 bg-black/5 backdrop-blur-md border dark:border-white/10 border-black/10 px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-widest text-emerald-500 dark:text-emerald-400 shadow-xl"
       >
         Java Edition
       </div>
-      <div class="text-2xl font-light text-zinc-300">
+      <div class="text-2xl font-light dark:text-zinc-300 text-gray-600">
         Latest Release 1.21
       </div>
     </div>
@@ -40,7 +40,7 @@
   <!-- Action Area -->
   <div class="mt-8 flex gap-4">
     <!-- Quick Play Button (Visual only here, logic is in BottomBar usually) -->
-    <div class="text-zinc-400 text-sm italic">
+    <div class="dark:text-zinc-400 text-gray-500 text-sm italic">
       Ready to play. Select version below or hit Launch.
     </div>
   </div>

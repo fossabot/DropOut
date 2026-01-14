@@ -32,24 +32,24 @@
 
 <div class="h-full flex flex-col p-6 overflow-hidden">
   <div class="flex items-center justify-between mb-6">
-     <h2 class="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">Settings</h2>
+     <h2 class="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r dark:from-white dark:to-white/60 from-gray-900 to-gray-600">Settings</h2>
   </div>
 
   <div class="flex-1 overflow-y-auto pr-2 space-y-6 custom-scrollbar pb-10">
 
     <!-- Appearance / Background -->
-    <div class="bg-black/20 p-6 rounded-2xl border border-white/5 ">
-      <h3 class="text-xs font-bold uppercase tracking-widest text-white/40 mb-6 flex items-center gap-2">
+    <div class="dark:bg-black/20 bg-white/60 p-6 rounded-2xl border dark:border-white/5 border-black/5 shadow-sm backdrop-blur-sm">
+      <h3 class="text-xs font-bold uppercase tracking-widest dark:text-white/40 text-black/40 mb-6 flex items-center gap-2">
         Appearance
       </h3>
       
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-white/70 mb-3">Custom Background Image</label>
+          <label class="block text-sm font-medium dark:text-white/70 text-black/70 mb-3">Custom Background Image</label>
           
           <div class="flex items-center gap-6">
             <!-- Preview -->
-            <div class="w-40 h-24 rounded-xl overflow-hidden bg-black/50 border border-white/10 relative group shadow-lg">
+            <div class="w-40 h-24 rounded-xl overflow-hidden dark:bg-black/50 bg-gray-200 border dark:border-white/10 border-black/10 relative group shadow-lg">
               {#if settingsState.settings.custom_background_path}
                 <img 
                   src={convertFileSrc(settingsState.settings.custom_background_path)} 
@@ -66,7 +66,7 @@
             <div class="flex flex-col gap-2">
               <button
                 onclick={selectBackground}
-                class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm transition-colors border border-white/5"
+                class="dark:bg-white/10 dark:hover:bg-white/20 bg-black/5 hover:bg-black/10 dark:text-white text-black px-4 py-2 rounded-lg text-sm transition-colors border dark:border-white/5 border-black/5"
               >
                 Select Image
               </button>
@@ -81,39 +81,39 @@
               {/if}
             </div>
           </div>
-          <p class="text-xs text-white/30 mt-3">
+          <p class="text-xs dark:text-white/30 text-black/40 mt-3">
             Select an image from your computer to replace the default gradient background.
             Supported formats: PNG, JPG, WEBP, GIF.
           </p>
         </div>
 
         <!-- Visual Settings -->
-        <div class="pt-4 border-t border-white/5 space-y-4">
+        <div class="pt-4 border-t dark:border-white/5 border-black/5 space-y-4">
              <div class="flex items-center justify-between">
                 <div>
-                   <h4 class="text-sm font-medium text-white/90" id="visual-effects-label">Visual Effects</h4>
-                   <p class="text-xs text-white/40 mt-1">Enable particle effects and animated gradients. (Default: On)</p>
+                   <h4 class="text-sm font-medium dark:text-white/90 text-black/80" id="visual-effects-label">Visual Effects</h4>
+                   <p class="text-xs dark:text-white/40 text-black/50 mt-1">Enable particle effects and animated gradients. (Default: On)</p>
                 </div>
                 <button 
                     aria-labelledby="visual-effects-label"
                     onclick={() => { settingsState.settings.enable_visual_effects = !settingsState.settings.enable_visual_effects; settingsState.saveSettings(); }}
-                    class="w-11 h-6 rounded-full transition-colors duration-200 ease-in-out relative focus:outline-none {settingsState.settings.enable_visual_effects ? 'bg-indigo-500' : 'bg-white/10'}"
+                    class="w-11 h-6 rounded-full transition-colors duration-200 ease-in-out relative focus:outline-none {settingsState.settings.enable_visual_effects ? 'bg-indigo-500' : 'dark:bg-white/10 bg-black/10'}"
                 >
                     <div class="absolute top-1 left-1 bg-white w-4 h-4 rounded-full shadow-sm transition-transform duration-200 ease-in-out {settingsState.settings.enable_visual_effects ? 'translate-x-5' : 'translate-x-0'}"></div>
                 </button>
              </div>
 
              {#if settingsState.settings.enable_visual_effects}
-                 <div class="flex items-center justify-between pl-2 border-l-2 border-white/5 ml-1">
+                 <div class="flex items-center justify-between pl-2 border-l-2 dark:border-white/5 border-black/5 ml-1">
                     <div>
-                       <h4 class="text-sm font-medium text-white/90" id="theme-effect-label">Theme Effect</h4>
-                       <p class="text-xs text-white/40 mt-1">Select the active visual theme.</p>
+                       <h4 class="text-sm font-medium dark:text-white/90 text-black/80" id="theme-effect-label">Theme Effect</h4>
+                       <p class="text-xs dark:text-white/40 text-black/50 mt-1">Select the active visual theme.</p>
                     </div>
                     <select
                         aria-labelledby="theme-effect-label"
                         bind:value={settingsState.settings.active_effect}
                         onchange={() => settingsState.saveSettings()}
-                        class="bg-black/40 text-white text-xs px-3 py-2 rounded-lg border border-white/10 outline-none focus:border-indigo-500/50 appearance-none cursor-pointer hover:bg-white/5 transition-colors"
+                        class="dark:bg-black/40 bg-white dark:text-white text-black text-xs px-3 py-2 rounded-lg border dark:border-white/10 border-black/10 outline-none focus:border-indigo-500/50 appearance-none cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                     >
                         <option value="saturn">Saturn (Saturn)</option>
                         <option value="constellation">Network (Constellation)</option>
@@ -123,23 +123,45 @@
 
              <div class="flex items-center justify-between">
                 <div>
-                   <h4 class="text-sm font-medium text-white/90" id="gpu-acceleration-label">GPU Acceleration</h4>
-                   <p class="text-xs text-white/40 mt-1">Enable GPU acceleration for the interface. (Default: Off, Requires Restart)</p>
+                   <h4 class="text-sm font-medium dark:text-white/90 text-black/80" id="gpu-acceleration-label">GPU Acceleration</h4>
+                   <p class="text-xs dark:text-white/40 text-black/50 mt-1">Enable GPU acceleration for the interface. (Default: Off, Requires Restart)</p>
                 </div>
                 <button 
                     aria-labelledby="gpu-acceleration-label"
                     onclick={() => { settingsState.settings.enable_gpu_acceleration = !settingsState.settings.enable_gpu_acceleration; settingsState.saveSettings(); }}
-                    class="w-11 h-6 rounded-full transition-colors duration-200 ease-in-out relative focus:outline-none {settingsState.settings.enable_gpu_acceleration ? 'bg-indigo-500' : 'bg-white/10'}"
+                    class="w-11 h-6 rounded-full transition-colors duration-200 ease-in-out relative focus:outline-none {settingsState.settings.enable_gpu_acceleration ? 'bg-indigo-500' : 'dark:bg-white/10 bg-black/10'}"
                 >
                     <div class="absolute top-1 left-1 bg-white w-4 h-4 rounded-full shadow-sm transition-transform duration-200 ease-in-out {settingsState.settings.enable_gpu_acceleration ? 'translate-x-5' : 'translate-x-0'}"></div>
                 </button>
+             </div>
+             
+             <!-- Color Theme Switcher -->
+             <div class="flex items-center justify-between pt-4 border-t dark:border-white/5 border-black/5 opacity-50 cursor-not-allowed">
+                <div>
+                   <h4 class="text-sm font-medium dark:text-white/90 text-black/80" id="color-theme-label">Color Theme</h4>
+                   <p class="text-xs dark:text-white/40 text-black/50 mt-1">Interface color mode. (Locked to Dark)</p>
+                </div>
+                <div class="flex items-center bg-black/5 dark:bg-white/5 rounded-lg p-1 pointer-events-none">
+                    <button
+                        disabled
+                        class="px-3 py-1 rounded-md text-xs font-medium transition-all text-gray-500 dark:text-gray-600"
+                    >
+                        Light
+                    </button>
+                    <button
+                        disabled
+                        class="px-3 py-1 rounded-md text-xs font-medium transition-all bg-indigo-500 text-white shadow-sm"
+                    >
+                        Dark
+                    </button>
+                </div>
              </div>
         </div>
       </div>
     </div>
 
     <!-- Java Path -->
-    <div class="bg-black/20 p-6 rounded-2xl border border-white/5 ">
+    <div class="dark:bg-black/20 bg-white/60 p-6 rounded-2xl border dark:border-white/5 border-black/5 shadow-sm backdrop-blur-sm">
       <h3 class="text-xs font-bold uppercase tracking-widest text-white/40 mb-6 flex items-center gap-2">
         Java Environment
       </h3>

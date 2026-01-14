@@ -31,12 +31,22 @@
 
   onMount(async () => {
     authState.checkAccount();
-    settingsState.loadSettings();
+    await settingsState.loadSettings();
     gameState.loadVersions();
     getVersion().then((v) => (uiState.appVersion = v));
     window.addEventListener("mousemove", handleMouseMove);
   });
   
+  $effect(() => {
+    if (settingsState.settings.theme === 'light') {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+        document.documentElement.classList.add('dark');
+        document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  });
+
   onDestroy(() => {
     if (typeof window !== 'undefined')
       window.removeEventListener("mousemove", handleMouseMove);
@@ -44,10 +54,10 @@
 </script>
 
 <div
-  class="relative h-screen w-screen overflow-hidden text-white font-sans selection:bg-indigo-500/30"
+  class="relative h-screen w-screen overflow-hidden dark:text-white text-gray-900 font-sans selection:bg-indigo-500/30"
 >
   <!-- Modern Animated Background -->
-  <div class="absolute inset-0 z-0 bg-[#09090b] overflow-hidden">
+  <div class="absolute inset-0 z-0 bg-[#09090b] dark:bg-[#09090b] bg-gray-100 overflow-hidden">
     {#if settingsState.settings.custom_background_path}
       <img
         src={convertFileSrc(settingsState.settings.custom_background_path)}
@@ -57,28 +67,35 @@
       <!-- Dimming Overlay for readability -->
       <div class="absolute inset-0 bg-black/50 "></div>
     {:else if settingsState.settings.enable_visual_effects}
-      <!-- Original Gradient -->
-      <div 
-        class="absolute inset-0 opacity-60 bg-gradient-to-br from-emerald-900 via-zinc-900 to-indigo-950"
-      ></div>
+      <!-- Original Gradient (Dark Only / or Adjusted for Light) -->
+      {#if settingsState.settings.theme === 'dark'}
+          <div 
+            class="absolute inset-0 opacity-60 bg-gradient-to-br from-emerald-900 via-zinc-900 to-indigo-950"
+          ></div>
+      {:else}
+           <!-- Light Mode Gradient -->
+           <div 
+            class="absolute inset-0 opacity-100 bg-gradient-to-br from-emerald-100 via-gray-100 to-indigo-100"
+          ></div>
+      {/if}
 
       {#if uiState.currentView === "home"}
         <ParticleBackground />
       {/if}
 
       <div 
-        class="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-black/50"
+        class="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-black/50 dark:from-zinc-900 dark:to-black/50 from-gray-100 to-transparent"
       ></div>
     {/if}
     
     <!-- Subtle Grid Overlay -->
-    <div class="absolute inset-0 z-0 opacity-10 pointer-events-none" 
-         style="background-image: linear-gradient(#ffffff 1px, transparent 1px), linear-gradient(90deg, #ffffff 1px, transparent 1px); background-size: 40px 40px; mask-image: radial-gradient(circle at 50% 50%, black 30%, transparent 70%);">
+    <div class="absolute inset-0 z-0 opacity-10 dark:opacity-10 opacity-30 pointer-events-none" 
+         style="background-image: linear-gradient({settingsState.settings.theme === 'dark' ? '#ffffff' : '#000000'} 1px, transparent 1px), linear-gradient(90deg, {settingsState.settings.theme === 'dark' ? '#ffffff' : '#000000'} 1px, transparent 1px); background-size: 40px 40px; mask-image: radial-gradient(circle at 50% 50%, black 30%, transparent 70%);">
     </div>
   </div>
 
   <!-- Content Wrapper -->
-  <div class="relative z-10 flex h-full p-4 gap-4">
+  <div class="relative z-10 flex h-full p-4 gap-4 text-gray-900 dark:text-white">
     <!-- Floating Sidebar -->
     <Sidebar />
 

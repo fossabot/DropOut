@@ -17,6 +17,7 @@ pub struct LauncherConfig {
     pub enable_gpu_acceleration: bool,
     pub enable_visual_effects: bool,
     pub active_effect: String,
+    pub theme: String,
 }
 
 impl Default for LauncherConfig {
@@ -32,6 +33,7 @@ impl Default for LauncherConfig {
             enable_gpu_acceleration: false,
             enable_visual_effects: true,
             active_effect: "constellation".to_string(),
+            theme: "dark".to_string(),
         }
     }
 }
