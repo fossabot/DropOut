@@ -2,22 +2,23 @@
   import { authState } from "../stores/auth.svelte";
   import { gameState } from "../stores/game.svelte";
   import { uiState } from "../stores/ui.svelte";
+  import { Terminal, ChevronDown, Play, User } from 'lucide-svelte';
 </script>
 
 <div
-  class="h-24 bg-gradient-to-t from-black/50 to-transparent dark:from-black/50 dark:to-transparent from-white/90 to-transparent border-t dark:border-white/5 border-black/5 flex items-center px-8 justify-between z-20 backdrop-blur-md"
+  class="h-20 bg-white/80 dark:bg-[#09090b]/90 border-t dark:border-white/10 border-black/5 flex items-center px-8 justify-between z-20 backdrop-blur-md"
 >
   <!-- Account Area -->
   <div class="flex items-center gap-6">
     <div
-      class="group flex items-center gap-4 cursor-pointer transition-all duration-300 hover:scale-105"
+      class="group flex items-center gap-4 cursor-pointer"
       onclick={() => authState.openLoginModal()}
       role="button"
       tabindex="0"
       onkeydown={(e) => e.key === "Enter" && authState.openLoginModal()}
     >
       <div
-        class="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 shadow-lg shadow-indigo-500/20 flex items-center justify-center text-white font-bold text-xl overflow-hidden ring-2 ring-transparent dark:group-hover:ring-white/20 group-hover:ring-black/10 transition-all"
+        class="w-10 h-10 rounded-sm bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden transition-all group-hover:border-zinc-400 dark:group-hover:border-zinc-500"
       >
         {#if authState.currentAccount}
           <img
@@ -26,20 +27,20 @@
             class="w-full h-full"
           />
         {:else}
-          <span class="text-white/50 text-2xl">?</span>
+          <User size={20} class="text-zinc-400" />
         {/if}
       </div>
       <div>
-        <div class="font-bold dark:text-white text-gray-900 text-lg group-hover:text-indigo-500 dark:group-hover:text-indigo-300 transition-colors">
-          {authState.currentAccount ? authState.currentAccount.username : "Login"}
+        <div class="font-bold dark:text-white text-gray-900 text-sm group-hover:text-black dark:group-hover:text-zinc-200 transition-colors">
+          {authState.currentAccount ? authState.currentAccount.username : "Login Account"}
         </div>
-        <div class="text-xs dark:text-zinc-400 text-gray-500 flex items-center gap-1.5">
+        <div class="text-[10px] uppercase tracking-wider dark:text-zinc-500 text-gray-500 flex items-center gap-2">
           <span
-            class="w-2 h-2 rounded-full {authState.currentAccount
-              ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
-              : 'dark:bg-zinc-600 bg-gray-400'}"
+            class="w-1.5 h-1.5 rounded-full {authState.currentAccount
+              ? 'bg-emerald-500'
+              : 'bg-zinc-400'}"
           ></span>
-          {authState.currentAccount ? "Ready to play" : "Guest Mode"}
+          {authState.currentAccount ? "Online" : "Guest"}
         </div>
       </div>
     </div>
@@ -48,27 +49,22 @@
     
     <!-- Console Toggle -->
     <button
-      class="text-xs font-mono dark:text-zinc-500 text-gray-500 dark:hover:text-white hover:text-black transition-colors flex items-center gap-2"
+      class="text-xs font-mono dark:text-zinc-500 text-gray-500 dark:hover:text-white hover:text-black transition-colors flex items-center gap-2 px-2 py-1 rounded-sm hover:bg-black/5 dark:hover:bg-white/5"
       onclick={() => uiState.toggleConsole()}
     >
-      <span class="text-lg">_</span>
-      {uiState.showConsole ? "Hide Logs" : "Show Logs"}
+      <Terminal size={14} />
+      {uiState.showConsole ? "HIDE LOGS" : "SHOW LOGS"}
     </button>
   </div>
 
   <!-- Action Area -->
-  <div class="flex items-center gap-6">
+  <div class="flex items-center gap-4">
     <div class="flex flex-col items-end mr-2">
-      <label
-        for="version-select"
-        class="text-[10px] dark:text-white/40 text-black/40 mb-1 uppercase font-bold tracking-wider"
-        >Selected Version</label
-      >
       <div class="relative group">
         <select
           id="version-select"
           bind:value={gameState.selectedVersion}
-          class="appearance-none dark:bg-black/40 bg-white/60 dark:text-white text-gray-900 border dark:border-white/10 border-black/10 rounded-xl pl-4 pr-10 py-2.5 dark:hover:border-white/30 hover:border-black/30 transition-all cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500/50 w-56 text-sm font-mono backdrop-blur-sm shadow-inner"
+          class="appearance-none dark:bg-zinc-900 bg-zinc-50 dark:text-white text-gray-900 border dark:border-white/10 border-black/10 rounded-sm pl-4 pr-10 py-2 dark:hover:border-white/30 hover:border-black/30 transition-all cursor-pointer outline-none focus:ring-1 focus:ring-zinc-500 w-56 text-sm font-mono"
         >
           {#if gameState.versions.length === 0}
             <option>Loading...</option>
@@ -78,22 +74,18 @@
             {/each}
           {/if}
         </select>
-        <div class="absolute right-3 top-1/2 -translate-y-1/2 dark:text-white/20 text-black/20 pointer-events-none dark:group-hover:text-white/50 group-hover:text-black/50 transition-colors">▼</div>
+        <div class="absolute right-3 top-1/2 -translate-y-1/2 dark:text-white/20 text-black/20 pointer-events-none">
+            <ChevronDown size={14} />
+        </div>
       </div>
     </div>
 
     <button
       onclick={() => gameState.startGame()}
-      class="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-bold h-14 px-10 rounded-xl transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] flex flex-col items-center justify-center uppercase tracking-widest text-xl relative overflow-hidden group"
+      class="bg-emerald-600 hover:bg-emerald-500 text-white h-14 px-10 rounded-sm transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-emerald-500/20 flex items-center gap-3 font-bold text-lg tracking-widest uppercase"
     >
-      <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 skew-y-12"></div>
-      <span class="relative z-10 flex items-center gap-2">
-        PLAY
-      </span>
-      <span
-        class="relative z-10 text-[9px] font-normal opacity-70 normal-case tracking-wide -mt-1"
-        >Launch Game</span
-      >
+      <Play size={24} fill="currentColor" />
+      <span>Launch</span>
     </button>
   </div>
 </div>
