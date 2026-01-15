@@ -110,7 +110,7 @@ jobs:
         if: matrix.wayland
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm webkit2gtk-4.1 base-devel curl wget file openssl gtk3 appindicator-gtk3 librsvg fuse2
+          pacman -S --noconfirm webkit2gtk-4.1 base-devel curl wget file openssl gtk3 libappindicator-gtk3 librsvg fuse2
 
       - name: Setup Wayland Environment (Arch)
         if: matrix.wayland
