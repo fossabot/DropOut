@@ -3,12 +3,67 @@
   import { gameState } from '../stores/game.svelte';
   import { releasesState } from '../stores/releases.svelte';
   import { Calendar, ExternalLink } from 'lucide-svelte';
+  import { getSaturnEffect } from './ParticleBackground.svelte';
 
   type Props = {
     mouseX: number;
     mouseY: number;
   };
   let { mouseX = 0, mouseY = 0 }: Props = $props();
+
+  // Saturn effect mouse interaction handlers
+  function handleSaturnMouseDown(e: MouseEvent) {
+    const effect = getSaturnEffect();
+    if (effect) {
+      effect.handleMouseDown(e.clientX);
+    }
+  }
+
+  function handleSaturnMouseMove(e: MouseEvent) {
+    const effect = getSaturnEffect();
+    if (effect) {
+      effect.handleMouseMove(e.clientX);
+    }
+  }
+
+  function handleSaturnMouseUp() {
+    const effect = getSaturnEffect();
+    if (effect) {
+      effect.handleMouseUp();
+    }
+  }
+
+  function handleSaturnMouseLeave() {
+    const effect = getSaturnEffect();
+    if (effect) {
+      effect.handleMouseUp();
+    }
+  }
+
+  function handleSaturnTouchStart(e: TouchEvent) {
+    if (e.touches.length === 1) {
+      const effect = getSaturnEffect();
+      if (effect) {
+        effect.handleTouchStart(e.touches[0].clientX);
+      }
+    }
+  }
+
+  function handleSaturnTouchMove(e: TouchEvent) {
+    if (e.touches.length === 1) {
+      const effect = getSaturnEffect();
+      if (effect) {
+        effect.handleTouchMove(e.touches[0].clientX);
+      }
+    }
+  }
+
+  function handleSaturnTouchEnd() {
+    const effect = getSaturnEffect();
+    if (effect) {
+      effect.handleTouchEnd();
+    }
+  }
 
   onMount(() => {
     releasesState.loadReleases();
@@ -104,8 +159,18 @@
 <!-- Scrollable Container -->
 <div class="relative z-10 h-full {releasesState.isLoading ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar scroll-smooth'}">
   
-  <!-- Hero Section (Full Height) -->
-  <div class="min-h-full flex flex-col justify-end p-12 pb-32">
+  <!-- Hero Section (Full Height) - Interactive area for Saturn rotation -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div 
+    class="min-h-full flex flex-col justify-end p-12 pb-32 cursor-grab active:cursor-grabbing select-none"
+    onmousedown={handleSaturnMouseDown}
+    onmousemove={handleSaturnMouseMove}
+    onmouseup={handleSaturnMouseUp}
+    onmouseleave={handleSaturnMouseLeave}
+    ontouchstart={handleSaturnTouchStart}
+    ontouchmove={handleSaturnTouchMove}
+    ontouchend={handleSaturnTouchEnd}
+  >
      <!-- 3D Floating Hero Text -->
       <div 
         class="transition-transform duration-200 ease-out origin-bottom-left"
