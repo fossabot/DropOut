@@ -7,6 +7,7 @@
 // Components
   import BottomBar from "./components/BottomBar.svelte";
   import HomeView from "./components/HomeView.svelte";
+  import InstancesView from "./components/InstancesView.svelte";
   import LoginModal from "./components/LoginModal.svelte";
   import ParticleBackground from "./components/ParticleBackground.svelte";
   import SettingsView from "./components/SettingsView.svelte";
@@ -116,6 +117,8 @@
           <div class="flex-1 relative overflow-hidden">
              {#if uiState.currentView === "home"}
                <HomeView mouseX={mouseX} mouseY={mouseY} />
+             {:else if uiState.currentView === "instances"}
+               <InstancesView />
              {:else if uiState.currentView === "versions"}
                <VersionsView />
              {:else if uiState.currentView === "settings"}
@@ -131,7 +134,7 @@
           </div>
           
           <!-- Bottom Bar -->
-          {#if uiState.currentView === "home"}
+          {#if uiState.currentView === "home" || uiState.currentView === "instances"}
             <BottomBar />
           {/if}
       </div>
