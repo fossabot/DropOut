@@ -65,6 +65,7 @@
           // Formatting helper
           const formatLine = (text: string) => text
               .replace(/\*\*(.*?)\*\*/g, '<strong class="text-zinc-200">$1</strong>')
+              .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em class="text-zinc-400 italic">$1</em>')
               .replace(/`([^`]+)`/g, '<code class="bg-zinc-800 px-1 py-0.5 rounded text-xs text-zinc-300 font-mono border border-white/5 break-all whitespace-normal">$1</code>')
               .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" class="text-indigo-400 hover:text-indigo-300 hover:underline decoration-indigo-400/30 break-all">$1</a>');
 
