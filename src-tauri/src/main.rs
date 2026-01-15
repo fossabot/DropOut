@@ -740,6 +740,27 @@ async fn install_version(
         format!("Loading version details for {}...", version_id)
     );
 
+    // First, try to fetch the vanilla version from Mojang and save it locally
+    let version_details = match core::manifest::load_local_version(&game_dir, &version_id).await {
+        Ok(v) => v,
+        Err(_) => {
+            // Not found locally, fetch from Mojang
+            emit_log!(window, format!("Fetching version {} from Mojang...", version_id));
+            let fetched = core::manifest::fetch_vanilla_version(&version_id)
+                .await
+                .map_err(|e| e.to_string())?;
+            
+            // Save the version JSON locally
+            emit_log!(window, format!("Saving version JSON..."));
+            core::manifest::save_local_version(&game_dir, &fetched)
+                .await
+                .map_err(|e| e.to_string())?;
+            
+            fetched
+        }
+    };
+
+    // Now load the full version with inheritance resolved
     let version_details = core::manifest::load_version(&game_dir, &version_id)
         .await
         .map_err(|e| e.to_string())?;
@@ -1301,10 +1322,11 @@ async fn list_installed_fabric_versions(window: Window) -> Result<Vec<String>, S
 struct InstalledVersion {
     id: String,
     #[serde(rename = "type")]
-    version_type: String, // "release", "snapshot", "fabric", "forge"
+    version_type: String, // "release", "snapshot", "fabric", "forge", "modpack"
 }
 
 /// List all installed versions from the data directory
+/// Simply lists all folders in the versions directory without validation
 #[tauri::command]
 async fn list_installed_versions(window: Window) -> Result<Vec<InstalledVersion>, String> {
     let app_handle = window.app_handle();
@@ -1325,42 +1347,39 @@ async fn list_installed_versions(window: Window) -> Result<Vec<InstalledVersion>
         .map_err(|e| e.to_string())?;
 
     while let Some(entry) = entries.next_entry().await.map_err(|e| e.to_string())? {
-        let name = entry.file_name().to_string_lossy().to_string();
-        let version_dir = entry.path();
-
-        // Check if the version has a valid JSON file
-        let json_path = version_dir.join(format!("{}.json", name));
-        if !json_path.exists() {
+        // Only include directories
+        if !entry.file_type().await.map_err(|e| e.to_string())?.is_dir() {
             continue;
         }
 
-        // Check if client.jar exists (for vanilla versions)
-        let jar_path = version_dir.join(format!("{}.jar", name));
-        let has_jar = jar_path.exists();
+        let name = entry.file_name().to_string_lossy().to_string();
+        let version_dir = entry.path();
 
-        // Determine version type
+        // Determine version type based on folder name or JSON content
         let version_type = if name.starts_with("fabric-loader-") {
-            // Fabric versions don't need their own jar, they inherit from vanilla
             "fabric".to_string()
-        } else if name.contains("-forge-") {
+        } else if name.contains("-forge") || name.contains("forge-") {
             "forge".to_string()
-        } else if has_jar {
-            // Read the JSON to determine if it's release or snapshot
-            if let Ok(content) = tokio::fs::read_to_string(&json_path).await {
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                    json.get("type")
-                        .and_then(|t| t.as_str())
-                        .unwrap_or("release")
-                        .to_string()
+        } else {
+            // Try to read JSON to get type, otherwise guess from name
+            let json_path = version_dir.join(format!("{}.json", name));
+            if json_path.exists() {
+                if let Ok(content) = tokio::fs::read_to_string(&json_path).await {
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                        json.get("type")
+                            .and_then(|t| t.as_str())
+                            .unwrap_or("modpack")
+                            .to_string()
+                    } else {
+                        "modpack".to_string()
+                    }
                 } else {
-                    "release".to_string()
+                    "modpack".to_string()
                 }
             } else {
-                "release".to_string()
+                // No JSON file - treat as modpack/custom
+                "modpack".to_string()
             }
-        } else {
-            // JSON exists but no jar - skip incomplete installations
-            continue;
         };
 
         installed.push(InstalledVersion {
@@ -1369,15 +1388,22 @@ async fn list_installed_versions(window: Window) -> Result<Vec<InstalledVersion>
         });
     }
 
-    // Sort: modded first, then by version id descending
+    // Sort: modded/modpack first, then by version id descending
     installed.sort_by(|a, b| {
-        let a_modded = a.version_type == "fabric" || a.version_type == "forge";
-        let b_modded = b.version_type == "fabric" || b.version_type == "forge";
-        
-        match (a_modded, b_modded) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => b.id.cmp(&a.id), // Descending order
+        let a_priority = match a.version_type.as_str() {
+            "fabric" | "forge" => 0,
+            "modpack" => 1,
+            _ => 2,
+        };
+        let b_priority = match b.version_type.as_str() {
+            "fabric" | "forge" => 0,
+            "modpack" => 1,
+            _ => 2,
+        };
+
+        match a_priority.cmp(&b_priority) {
+            std::cmp::Ordering::Equal => b.id.cmp(&a.id), // Descending order
+            other => other,
         }
     });
 

@@ -86,6 +86,7 @@
       case 'fabric': return 'text-indigo-400';
       case 'forge': return 'text-orange-400';
       case 'snapshot': return 'text-amber-400';
+      case 'modpack': return 'text-purple-400';
       default: return 'text-emerald-400';
     }
   }
