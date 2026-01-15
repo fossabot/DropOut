@@ -14,43 +14,48 @@ select {
   padding-right: 2rem;
 }
 
-/* Custom scrollbar for dropdowns and lists */
-select,
-.custom-select {
-  scrollbar-width: thin;
-  scrollbar-color: #3f3f46 #18181b;
-}
-
-/* Webkit scrollbar for select (when expanded, browser-dependent) */
-select::-webkit-scrollbar {
-  width: 8px;
-}
-
-select::-webkit-scrollbar-track {
-  background: #18181b;
-}
-
-select::-webkit-scrollbar-thumb {
-  background-color: #3f3f46;
-  border-radius: 4px;
-}
-
-select::-webkit-scrollbar-thumb:hover {
-  background-color: #52525b;
-}
-
-/* Option styling (limited browser support but good for Tauri/WebView) */
+/* Option styling - works in WebView/Chromium */
 select option {
   background-color: #18181b;
   color: #e4e4e7;
-  padding: 8px 12px;
+  padding: 12px 16px;
+  font-size: 13px;
+  border: none;
 }
 
 select option:hover,
-select option:focus,
+select option:focus {
+  background-color: #3730a3 !important;
+  color: white !important;
+}
+
 select option:checked {
-  background: linear-gradient(#3730a3, #3730a3);
+  background: linear-gradient(0deg, #4f46e5 0%, #4f46e5 100%);
   color: white;
+  font-weight: 500;
+}
+
+select option:disabled {
+  color: #52525b;
+  background-color: #18181b;
+}
+
+/* Optgroup styling */
+select optgroup {
+  background-color: #18181b;
+  color: #a1a1aa;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 8px 12px 4px;
+}
+
+/* Select focus state */
+select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
 }
 
 /* ==================== Custom Scrollbar (Global) ==================== */
@@ -117,4 +122,44 @@ input[type="number"]::-webkit-inner-spin-button {
 
 input[type="number"] {
   -moz-appearance: textfield;
+}
+
+/* ==================== Checkbox Styling ==================== */
+
+input[type="checkbox"] {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid #3f3f46;
+  border-radius: 4px;
+  background-color: #18181b;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+}
+
+input[type="checkbox"]:hover {
+  border-color: #52525b;
+}
+
+input[type="checkbox"]:checked {
+  background-color: #4f46e5;
+  border-color: #4f46e5;
+}
+
+input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+input[type="checkbox"]:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
 }

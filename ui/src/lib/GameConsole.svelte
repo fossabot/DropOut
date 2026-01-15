@@ -6,6 +6,8 @@
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-shell";
   import { onMount, tick } from "svelte";
+  import CustomSelect from "../components/CustomSelect.svelte";
+  import { ChevronDown, Check } from 'lucide-svelte';
 
   let consoleElement: HTMLDivElement;
   let autoScroll = $state(true);
@@ -21,7 +23,10 @@
   let selectedSource = $state("all");
 
   // Get sorted sources for dropdown
-  let sortedSources = $derived([...logsState.sources].sort());
+  let sourceOptions = $derived([
+    { value: "all", label: "All Sources" },
+    ...[...logsState.sources].sort().map(s => ({ value: s, label: s }))
+  ]);
 
   // Derived filtered logs
   let filteredLogs = $derived(logsState.logs.filter((log) => {
@@ -151,15 +156,11 @@
         <h3 class="font-bold text-zinc-100 uppercase tracking-wider px-2">Console</h3>
         
         <!-- Source Dropdown -->
-        <select 
+        <CustomSelect
+            options={sourceOptions}
             bind:value={selectedSource}
-            class="bg-zinc-900 border border-zinc-700 rounded-md px-3 py-1.5 pr-8 text-zinc-300 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 cursor-pointer hover:border-zinc-600 transition-colors"
-        >
-            <option value="all">All Sources</option>
-            {#each sortedSources as source}
-                <option value={source}>{source}</option>
-            {/each}
-        </select>
+            class="w-36"
+        />
 
         <!-- Level Filters -->
         <div class="flex items-center bg-[#1e1e1e] rounded border border-[#3e3e42] overflow-hidden">

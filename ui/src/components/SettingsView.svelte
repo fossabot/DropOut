@@ -1,10 +1,21 @@
 <script lang="ts">
   import { open } from "@tauri-apps/plugin-dialog";
   import { settingsState } from "../stores/settings.svelte";
+  import CustomSelect from "./CustomSelect.svelte";
 
   // Use convertFileSrc directly from settingsState.backgroundUrl for cleaner approach
   // or use the imported one if passing raw path.
   import { convertFileSrc } from "@tauri-apps/api/core";
+
+  const effectOptions = [
+    { value: "saturn", label: "Saturn" },
+    { value: "constellation", label: "Network (Constellation)" }
+  ];
+
+  const logServiceOptions = [
+    { value: "paste.rs", label: "paste.rs (Free, No Account)" },
+    { value: "pastebin.com", label: "pastebin.com (Requires API Key)" }
+  ];
 
   async function selectBackground() {
     try {
@@ -116,15 +127,12 @@
                        <h4 class="text-sm font-medium dark:text-white/90 text-black/80" id="theme-effect-label">Theme Effect</h4>
                        <p class="text-xs dark:text-white/40 text-black/50 mt-1">Select the active visual theme.</p>
                     </div>
-                    <select
-                        aria-labelledby="theme-effect-label"
+                    <CustomSelect
+                        options={effectOptions}
                         bind:value={settingsState.settings.active_effect}
                         onchange={() => settingsState.saveSettings()}
-                        class="dark:bg-zinc-900 bg-white dark:text-white text-black text-xs px-3 py-2 pr-8 rounded-lg border dark:border-zinc-700 border-gray-300 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 cursor-pointer hover:border-zinc-600 transition-colors"
-                    >
-                        <option value="saturn">Saturn (Saturn)</option>
-                        <option value="constellation">Network (Constellation)</option>
-                    </select>
+                        class="w-52"
+                    />
                  </div>
              {/if}
 
@@ -308,14 +316,11 @@
         <div class="space-y-4">
             <div>
                 <label for="log-service" class="block text-sm font-medium text-white/70 mb-2">Log Upload Service</label>
-                <select
-                    id="log-service"
+                <CustomSelect
+                    options={logServiceOptions}
                     bind:value={settingsState.settings.log_upload_service}
-                    class="dark:bg-zinc-900 bg-white dark:text-white text-black w-full px-4 py-3 pr-10 rounded-xl border dark:border-zinc-700 border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 outline-none cursor-pointer hover:border-zinc-600 transition-colors"
-                >
-                    <option value="paste.rs">paste.rs (Free, No Account)</option>
-                    <option value="pastebin.com">pastebin.com (Requires API Key)</option>
-                </select>
+                    class="w-full"
+                />
             </div>
 
             {#if settingsState.settings.log_upload_service === 'pastebin.com'}
