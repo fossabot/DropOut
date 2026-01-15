@@ -631,7 +631,7 @@ pub fn detect_all_java_installations() -> Vec<JavaInstallation> {
     installations
 }
 
-/// Recursively find the java executable in a directory
+//// Find the java executable in a directory using a limited-depth search
 fn find_java_executable(dir: &PathBuf) -> Option<PathBuf> {
     let bin_name = if cfg!(windows) { "java.exe" } else { "java" };
 
