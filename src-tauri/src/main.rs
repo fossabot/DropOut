@@ -121,6 +121,13 @@ async fn start_game(
         format!("Loading version details for {}...", version_id)
     );
 
+    // First, load the local version to get the original inheritsFrom value
+    // (before merge clears it)
+    let original_inherits_from = match core::manifest::load_local_version(&game_dir, &version_id).await {
+        Ok(local_version) => local_version.inherits_from.clone(),
+        Err(_) => None,
+    };
+
     let version_details = core::manifest::load_version(&game_dir, &version_id)
         .await
         .map_err(|e| e.to_string())?;
@@ -135,9 +142,7 @@ async fn start_game(
 
     // Determine the actual minecraft version for client.jar
     // (for modded versions, this is the parent vanilla version)
-    let minecraft_version = version_details
-        .inherits_from
-        .clone()
+    let minecraft_version = original_inherits_from
         .unwrap_or_else(|| version_id.clone());
 
     // 2. Prepare download tasks
@@ -380,12 +385,19 @@ async fn start_game(
     for lib in &version_details.libraries {
         if core::rules::is_library_allowed(&lib.rules) {
             if let Some(downloads) = &lib.downloads {
+                // Standard library with explicit downloads
                 if let Some(artifact) = &downloads.artifact {
                     let path_str = artifact
                         .path
                         .clone()
                         .unwrap_or_else(|| format!("{}.jar", lib.name));
                     let lib_path = libraries_dir.join(path_str);
+                    classpath_entries.push(lib_path.to_string_lossy().to_string());
+                }
+            } else {
+                // Library without explicit downloads (mod loader libraries)
+                // Use Maven coordinate resolution
+                if let Some(lib_path) = core::maven::get_library_path(&lib.name, &libraries_dir) {
                     classpath_entries.push(lib_path.to_string_lossy().to_string());
                 }
             }
@@ -1452,6 +1464,7 @@ async fn get_forge_versions_for_game(
 #[tauri::command]
 async fn install_forge(
     window: Window,
+    config_state: State<'_, core::config::ConfigState>,
     game_version: String,
     forge_version: String,
 ) -> Result<core::forge::InstalledForgeVersion, String> {
@@ -1469,6 +1482,31 @@ async fn install_forge(
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {}", e))?;
 
+    // Get Java path from config or detect
+    let config = config_state.config.lock().unwrap().clone();
+    let java_path_str = if !config.java_path.is_empty() && config.java_path != "java" {
+        config.java_path.clone()
+    } else {
+        // Try to find a suitable Java installation
+        let javas = core::java::detect_all_java_installations(&app_handle);
+        if let Some(java) = javas.first() {
+            java.path.clone()
+        } else {
+            return Err("No Java installation found. Please configure Java in settings.".to_string());
+        }
+    };
+    let java_path = std::path::PathBuf::from(&java_path_str);
+
+    emit_log!(window, "Running Forge installer...".to_string());
+
+    // Run the Forge installer to properly patch the client
+    core::forge::run_forge_installer(&game_dir, &game_version, &forge_version, &java_path)
+        .await
+        .map_err(|e| format!("Forge installer failed: {}", e))?;
+
+    emit_log!(window, "Forge installer completed, creating version profile...".to_string());
+
+    // Now create the version JSON
     let result = core::forge::install_forge(&game_dir, &game_version, &forge_version)
         .await
         .map_err(|e| e.to_string())?;
