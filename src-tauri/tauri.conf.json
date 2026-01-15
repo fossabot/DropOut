@@ -3,8 +3,8 @@
     "version": "0.1.19",
     "identifier": "com.dropout.launcher",
     "build": {
-        "beforeDevCommand": "cd ../ui && pnpm dev",
-        "beforeBuildCommand": "cd ../ui && pnpm build",
+        "beforeDevCommand": "pnpm -C ../ui dev",
+        "beforeBuildCommand": "pnpm -C ../ui build",
         "devUrl": "http://localhost:5173",
         "frontendDist": "../ui/dist"
     },
