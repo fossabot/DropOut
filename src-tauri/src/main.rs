@@ -680,6 +680,279 @@ async fn get_versions() -> Result<Vec<core::manifest::Version>, String> {
     }
 }
 
+/// Check if a version is installed (has client.jar)
+#[tauri::command]
+async fn check_version_installed(window: Window, version_id: String) -> Result<bool, String> {
+    let app_handle = window.app_handle();
+    let game_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+
+    // For modded versions, check the parent vanilla version
+    let minecraft_version = if version_id.starts_with("fabric-loader-") {
+        // Format: fabric-loader-X.X.X-1.20.4
+        version_id.split('-').last().unwrap_or(&version_id).to_string()
+    } else if version_id.contains("-forge-") {
+        // Format: 1.20.4-forge-49.0.38
+        version_id.split("-forge-").next().unwrap_or(&version_id).to_string()
+    } else {
+        version_id.clone()
+    };
+
+    let client_jar = game_dir
+        .join("versions")
+        .join(&minecraft_version)
+        .join(format!("{}.jar", minecraft_version));
+
+    Ok(client_jar.exists())
+}
+
+/// Install a version (download client, libraries, assets) without launching
+#[tauri::command]
+async fn install_version(
+    window: Window,
+    config_state: State<'_, core::config::ConfigState>,
+    version_id: String,
+) -> Result<(), String> {
+    emit_log!(
+        window,
+        format!("Starting installation for version: {}", version_id)
+    );
+
+    let config = config_state.config.lock().unwrap().clone();
+    let app_handle = window.app_handle();
+    let game_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+
+    // Ensure game directory exists
+    tokio::fs::create_dir_all(&game_dir)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    emit_log!(window, format!("Game directory: {:?}", game_dir));
+
+    // Load version (supports both vanilla and modded versions with inheritance)
+    emit_log!(
+        window,
+        format!("Loading version details for {}...", version_id)
+    );
+
+    let version_details = core::manifest::load_version(&game_dir, &version_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    emit_log!(
+        window,
+        format!(
+            "Version details loaded: main class = {}",
+            version_details.main_class
+        )
+    );
+
+    // Determine the actual minecraft version for client.jar
+    let minecraft_version = version_details
+        .inherits_from
+        .clone()
+        .unwrap_or_else(|| version_id.clone());
+
+    // Prepare download tasks
+    emit_log!(window, "Preparing download tasks...".to_string());
+    let mut download_tasks = Vec::new();
+
+    // --- Client Jar ---
+    let downloads = version_details
+        .downloads
+        .as_ref()
+        .ok_or("Version has no downloads information")?;
+    let client_jar = &downloads.client;
+    let mut client_path = game_dir.join("versions");
+    client_path.push(&minecraft_version);
+    client_path.push(format!("{}.jar", minecraft_version));
+
+    download_tasks.push(core::downloader::DownloadTask {
+        url: client_jar.url.clone(),
+        path: client_path.clone(),
+        sha1: client_jar.sha1.clone(),
+        sha256: None,
+    });
+
+    // --- Libraries ---
+    let libraries_dir = game_dir.join("libraries");
+
+    for lib in &version_details.libraries {
+        if core::rules::is_library_allowed(&lib.rules) {
+            if let Some(downloads) = &lib.downloads {
+                if let Some(artifact) = &downloads.artifact {
+                    let path_str = artifact
+                        .path
+                        .clone()
+                        .unwrap_or_else(|| format!("{}.jar", lib.name));
+
+                    let mut lib_path = libraries_dir.clone();
+                    lib_path.push(path_str);
+
+                    download_tasks.push(core::downloader::DownloadTask {
+                        url: artifact.url.clone(),
+                        path: lib_path,
+                        sha1: artifact.sha1.clone(),
+                        sha256: None,
+                    });
+                }
+
+                // Native Library (classifiers)
+                if let Some(classifiers) = &downloads.classifiers {
+                    let os_key = if cfg!(target_os = "linux") {
+                        "natives-linux"
+                    } else if cfg!(target_os = "windows") {
+                        "natives-windows"
+                    } else if cfg!(target_os = "macos") {
+                        "natives-osx"
+                    } else {
+                        ""
+                    };
+
+                    if let Some(native_artifact_value) = classifiers.get(os_key) {
+                        if let Ok(native_artifact) =
+                            serde_json::from_value::<core::game_version::DownloadArtifact>(
+                                native_artifact_value.clone(),
+                            )
+                        {
+                            let path_str = native_artifact.path.clone().unwrap();
+                            let mut native_path = libraries_dir.clone();
+                            native_path.push(&path_str);
+
+                            download_tasks.push(core::downloader::DownloadTask {
+                                url: native_artifact.url,
+                                path: native_path.clone(),
+                                sha1: native_artifact.sha1,
+                                sha256: None,
+                            });
+                        }
+                    }
+                }
+            } else {
+                // Library without explicit downloads (mod loader libraries)
+                if let Some(url) =
+                    core::maven::resolve_library_url(&lib.name, None, lib.url.as_deref())
+                {
+                    if let Some(lib_path) = core::maven::get_library_path(&lib.name, &libraries_dir)
+                    {
+                        download_tasks.push(core::downloader::DownloadTask {
+                            url,
+                            path: lib_path,
+                            sha1: None,
+                            sha256: None,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Assets ---
+    let assets_dir = game_dir.join("assets");
+    let objects_dir = assets_dir.join("objects");
+    let indexes_dir = assets_dir.join("indexes");
+
+    let asset_index = version_details
+        .asset_index
+        .as_ref()
+        .ok_or("Version has no asset index information")?;
+
+    let asset_index_path = indexes_dir.join(format!("{}.json", asset_index.id));
+
+    let asset_index_content: String = if asset_index_path.exists() {
+        tokio::fs::read_to_string(&asset_index_path)
+            .await
+            .map_err(|e| e.to_string())?
+    } else {
+        emit_log!(window, format!("Downloading asset index..."));
+        let content = reqwest::get(&asset_index.url)
+            .await
+            .map_err(|e| e.to_string())?
+            .text()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        tokio::fs::create_dir_all(&indexes_dir)
+            .await
+            .map_err(|e| e.to_string())?;
+        tokio::fs::write(&asset_index_path, &content)
+            .await
+            .map_err(|e| e.to_string())?;
+        content
+    };
+
+    #[derive(serde::Deserialize)]
+    struct AssetObject {
+        hash: String,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct AssetIndexJson {
+        objects: std::collections::HashMap<String, AssetObject>,
+    }
+
+    let asset_index_parsed: AssetIndexJson =
+        serde_json::from_str(&asset_index_content).map_err(|e| e.to_string())?;
+
+    emit_log!(
+        window,
+        format!("Processing {} assets...", asset_index_parsed.objects.len())
+    );
+
+    for (_name, object) in asset_index_parsed.objects {
+        let hash = object.hash;
+        let prefix = &hash[0..2];
+        let path = objects_dir.join(prefix).join(&hash);
+        let url = format!(
+            "https://resources.download.minecraft.net/{}/{}",
+            prefix, hash
+        );
+
+        download_tasks.push(core::downloader::DownloadTask {
+            url,
+            path,
+            sha1: Some(hash),
+            sha256: None,
+        });
+    }
+
+    emit_log!(
+        window,
+        format!(
+            "Total download tasks: {} (Client + Libraries + Assets)",
+            download_tasks.len()
+        )
+    );
+
+    // Start Download
+    emit_log!(
+        window,
+        format!(
+            "Starting downloads with {} concurrent threads...",
+            config.download_threads
+        )
+    );
+    core::downloader::download_files(
+        window.clone(),
+        download_tasks,
+        config.download_threads as usize,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    emit_log!(
+        window,
+        format!("Installation of {} completed successfully!", version_id)
+    );
+
+    Ok(())
+}
+
 #[tauri::command]
 async fn login_offline(
     window: Window,
@@ -765,24 +1038,39 @@ async fn complete_microsoft_login(
     ms_refresh_state: State<'_, MsRefreshTokenState>,
     device_code: String,
 ) -> Result<core::auth::Account, String> {
+    // Helper to emit auth progress
+    let emit_progress = |step: &str| {
+        let _ = window.emit("auth-progress", step);
+    };
+
     // 1. Poll (once) for token
+    emit_progress("Receiving token from Microsoft...");
     let token_resp = core::auth::exchange_code_for_token(&device_code).await?;
+    emit_progress("Token received successfully!");
 
     // Store MS refresh token
     let ms_refresh_token = token_resp.refresh_token.clone();
     *ms_refresh_state.token.lock().unwrap() = ms_refresh_token.clone();
 
     // 2. Xbox Live Auth
+    emit_progress("Authenticating with Xbox Live...");
     let (xbl_token, uhs) = core::auth::method_xbox_live(&token_resp.access_token).await?;
+    emit_progress("Xbox Live authentication successful!");
 
     // 3. XSTS Auth
+    emit_progress("Authenticating with XSTS...");
     let xsts_token = core::auth::method_xsts(&xbl_token).await?;
+    emit_progress("XSTS authentication successful!");
 
     // 4. Minecraft Auth
+    emit_progress("Authenticating with Minecraft...");
     let mc_token = core::auth::login_minecraft(&xsts_token, &uhs).await?;
+    emit_progress("Minecraft authentication successful!");
 
     // 5. Get Profile
+    emit_progress("Fetching Minecraft profile...");
     let profile = core::auth::fetch_profile(&mc_token).await?;
+    emit_progress(&format!("Welcome, {}!", profile.name));
 
     // 6. Create Account
     let account = core::auth::Account::Microsoft(core::auth::MicrosoftAccount {
@@ -1241,6 +1529,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             start_game,
             get_versions,
+            check_version_installed,
+            install_version,
             login_offline,
             get_active_account,
             logout,
