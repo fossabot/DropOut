@@ -114,7 +114,7 @@ async fn start_game(
             emit_log!(window, format!("Using instance: {} ({})", instance.name, inst_id));
             
             // Instance directory is the game directory
-            let inst_dir = manager.instance_dir(inst_id);
+            let inst_dir = manager.instance_dir(inst_id)?;
             
             // Use instance settings if set, otherwise fall back to global config
             (

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::path::PathBuf;
+use std::fs::{self, symlink_metadata};
+use std::io::{Read, Write};
+use std::path::{PathBuf};
 use uuid::Uuid;
 
 /// Represents a game instance with its own isolated game directory
@@ -83,6 +84,24 @@ pub struct InstanceManager {
     app_data_dir: PathBuf,
 }
 
+/// Validate instance ID to prevent path traversal attacks
+fn validate_instance_id(instance_id: &str) -> Result<(), String> {
+    // Only allow alphanumeric characters and hyphens (UUID format)
+    if instance_id.is_empty() {
+        return Err("Instance ID cannot be empty".to_string());
+    }
+    
+    if !instance_id.chars().all(|c| c.is_alphanumeric() || c == '-') {
+        return Err("Instance ID contains invalid characters".to_string());
+    }
+    
+    if instance_id.contains("..") {
+        return Err("Instance ID contains path traversal attempt".to_string());
+    }
+    
+    Ok(())
+}
+
 impl InstanceManager {
     pub fn new(app_data_dir: PathBuf) -> Self {
         Self { app_data_dir }
@@ -98,9 +117,10 @@ impl InstanceManager {
         self.app_data_dir.join("instances.json")
     }
 
-    /// Get an instance directory by ID
-    pub fn instance_dir(&self, instance_id: &str) -> PathBuf {
-        self.instances_dir().join(instance_id)
+    /// Get an instance directory by ID (with validation)
+    pub fn instance_dir(&self, instance_id: &str) -> Result<PathBuf, String> {
+        validate_instance_id(instance_id)?;
+        Ok(self.instances_dir().join(instance_id))
     }
 
     /// Load the instance index
@@ -123,7 +143,7 @@ impl InstanceManager {
 
     /// Load an instance by ID
     pub fn load_instance(&self, instance_id: &str) -> Result<Instance, String> {
-        let instance_dir = self.instance_dir(instance_id);
+        let instance_dir = self.instance_dir(instance_id)?;
         let instance_json = instance_dir.join("instance.json");
         
         if !instance_json.exists() {
@@ -136,7 +156,7 @@ impl InstanceManager {
 
     /// Save an instance
     fn save_instance(&self, instance: &Instance) -> Result<(), String> {
-        let instance_dir = self.instance_dir(&instance.id);
+        let instance_dir = self.instance_dir(&instance.id)?;
         fs::create_dir_all(&instance_dir).map_err(|e| e.to_string())?;
         
         let instance_json = instance_dir.join("instance.json");
@@ -149,7 +169,7 @@ impl InstanceManager {
         let instance = Instance::new(name, version_id);
         
         // Create instance directory structure
-        let instance_dir = self.instance_dir(&instance.id);
+        let instance_dir = self.instance_dir(&instance.id)?;
         fs::create_dir_all(&instance_dir).map_err(|e| e.to_string())?;
         
         // Create subdirectories
@@ -188,7 +208,7 @@ impl InstanceManager {
         self.save_index(&index)?;
         
         // Delete instance directory
-        let instance_dir = self.instance_dir(instance_id);
+        let instance_dir = self.instance_dir(instance_id)?;
         if instance_dir.exists() {
             fs::remove_dir_all(&instance_dir).map_err(|e| e.to_string())?;
         }
@@ -216,7 +236,8 @@ impl InstanceManager {
     /// Update an instance
     pub fn update_instance(&self, instance: Instance) -> Result<Instance, String> {
         // Verify instance exists
-        if !self.instance_dir(&instance.id).exists() {
+        let instance_dir = self.instance_dir(&instance.id)?;
+        if !instance_dir.exists() {
             return Err(format!("Instance {} not found", instance.id));
         }
         
@@ -237,7 +258,7 @@ impl InstanceManager {
     /// Duplicate an instance
     pub fn duplicate_instance(&self, instance_id: &str, new_name: String) -> Result<Instance, String> {
         let source = self.load_instance(instance_id)?;
-        let source_dir = self.instance_dir(instance_id);
+        let source_dir = self.instance_dir(instance_id)?;
         
         // Create new instance with same settings
         let mut new_instance = Instance::new(new_name, source.version_id.clone());
@@ -248,9 +269,9 @@ impl InstanceManager {
         new_instance.height = source.height;
         new_instance.jvm_args = source.jvm_args.clone();
         
-        let new_dir = self.instance_dir(&new_instance.id);
+        let new_dir = self.instance_dir(&new_instance.id)?;
         
-        // Copy directory contents
+        // Copy directory contents (skip symlinks for security)
         copy_dir_recursive(&source_dir, &new_dir)?;
         
         // Save new instance.json (overwrites copied one)
@@ -299,7 +320,7 @@ impl InstanceManager {
 
     /// Export instance to zip file
     pub async fn export_instance(&self, instance_id: &str, output_path: PathBuf) -> Result<(), String> {
-        let instance_dir = self.instance_dir(instance_id);
+        let instance_dir = self.instance_dir(instance_id)?;
         if !instance_dir.exists() {
             return Err(format!("Instance {} not found", instance_id));
         }
@@ -310,7 +331,7 @@ impl InstanceManager {
         let options = zip::write::SimpleFileOptions::default()
             .compression_method(zip::CompressionMethod::Deflated);
         
-        // Walk directory and add files
+        // Walk directory and add files (skip symlinks for security)
         add_dir_to_zip(&mut zip, &instance_dir, &instance_dir, options)?;
         
         zip.finish().map_err(|e| e.to_string())?;
@@ -318,18 +339,52 @@ impl InstanceManager {
         Ok(())
     }
 
-    /// Import instance from zip file
+    /// Import instance from zip file (with security validation)
     pub async fn import_instance(&self, zip_path: PathBuf, name: Option<String>) -> Result<Instance, String> {
         let file = std::fs::File::open(&zip_path).map_err(|e| e.to_string())?;
         let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
         
         // Create new instance ID
         let new_id = Uuid::new_v4().to_string();
-        let instance_dir = self.instance_dir(&new_id);
+        let instance_dir = self.instance_dir(&new_id)?;
         fs::create_dir_all(&instance_dir).map_err(|e| e.to_string())?;
         
-        // Extract zip
-        archive.extract(&instance_dir).map_err(|e| e.to_string())?;
+        // Securely extract zip - validate each file path to prevent Zip Slip attacks
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+            
+            // Use enclosed_name() for security - it returns None for paths with .. or absolute paths
+            let outpath = match file.enclosed_name() {
+                Some(path) => instance_dir.join(path),
+                None => {
+                    eprintln!("Skipping potentially unsafe path in zip: {:?}", file.name());
+                    continue;
+                }
+            };
+            
+            // Double-check that the resolved path is still within instance_dir
+            if !outpath.starts_with(&instance_dir) {
+                return Err(format!(
+                    "Zip file contains path traversal attempt: {}",
+                    file.name()
+                ));
+            }
+            
+            if file.is_dir() {
+                fs::create_dir_all(&outpath).map_err(|e| e.to_string())?;
+            } else {
+                // Create parent directories if needed
+                if let Some(parent) = outpath.parent() {
+                    fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+                }
+                
+                // Write file contents
+                let mut outfile = fs::File::create(&outpath).map_err(|e| e.to_string())?;
+                let mut buffer = Vec::new();
+                file.read_to_end(&mut buffer).map_err(|e| e.to_string())?;
+                outfile.write_all(&buffer).map_err(|e| e.to_string())?;
+            }
+        }
         
         // Load and update instance.json
         let instance_json_path = instance_dir.join("instance.json");
@@ -367,7 +422,7 @@ impl InstanceManager {
     }
 }
 
-/// Recursively copy a directory
+/// Recursively copy a directory (skips symlinks for security)
 fn copy_dir_recursive(src: &PathBuf, dst: &PathBuf) -> Result<(), String> {
     fs::create_dir_all(dst).map_err(|e| e.to_string())?;
     
@@ -376,7 +431,14 @@ fn copy_dir_recursive(src: &PathBuf, dst: &PathBuf) -> Result<(), String> {
         let path = entry.path();
         let dest_path = dst.join(entry.file_name());
         
-        if path.is_dir() {
+        // Check if it's a symlink - skip for security
+        let metadata = symlink_metadata(&path).map_err(|e| e.to_string())?;
+        if metadata.is_symlink() {
+            eprintln!("Skipping symlink during copy: {:?}", path);
+            continue;
+        }
+        
+        if metadata.is_dir() {
             copy_dir_recursive(&path, &dest_path)?;
         } else {
             fs::copy(&path, &dest_path).map_err(|e| e.to_string())?;
@@ -386,7 +448,7 @@ fn copy_dir_recursive(src: &PathBuf, dst: &PathBuf) -> Result<(), String> {
     Ok(())
 }
 
-/// Add directory contents to zip
+/// Add directory contents to zip (skips symlinks for security)
 fn add_dir_to_zip<W: std::io::Write + std::io::Seek>(
     zip: &mut zip::ZipWriter<W>,
     dir: &PathBuf,
@@ -396,10 +458,18 @@ fn add_dir_to_zip<W: std::io::Write + std::io::Seek>(
     for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
+        
+        // Check if it's a symlink - skip for security
+        let metadata = symlink_metadata(&path).map_err(|e| e.to_string())?;
+        if metadata.is_symlink() {
+            eprintln!("Skipping symlink during zip: {:?}", path);
+            continue;
+        }
+        
         let relative_path = path.strip_prefix(base).map_err(|e| e.to_string())?;
         let name = relative_path.to_string_lossy();
         
-        if path.is_dir() {
+        if metadata.is_dir() {
             zip.add_directory(format!("{}/", name), options)
                 .map_err(|e| e.to_string())?;
             add_dir_to_zip(zip, &path, base, options)?;
