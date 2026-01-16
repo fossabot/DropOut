@@ -7,12 +7,12 @@ export class InstancesState {
   activeInstanceId = $state<string | null>(null);
   isLoading = $state(false);
   error = $state("");
-  
+
   // Modal states
   showEditModal = $state(false);
   editingInstance = $state<Instance | null>(null);
   isCreating = $state(false);
-  
+
   // Import/Export states
   showImportExportModal = $state(false);
   isExporting = $state(false);
@@ -21,18 +21,18 @@ export class InstancesState {
   // Get active instance
   get activeInstance(): Instance | null {
     if (!this.activeInstanceId) return null;
-    return this.instances.find(i => i.id === this.activeInstanceId) || null;
+    return this.instances.find((i) => i.id === this.activeInstanceId) || null;
   }
 
   // Load all instances
   async loadInstances() {
     this.isLoading = true;
     this.error = "";
-    
+
     try {
       this.instances = await invoke<Instance[]>("list_instances");
       this.activeInstanceId = await invoke<string | null>("get_active_instance");
-      
+
       // If no active instance but we have instances, set the first one
       if (!this.activeInstanceId && this.instances.length > 0) {
         await this.setActiveInstance(this.instances[0].id);
@@ -52,14 +52,14 @@ export class InstancesState {
         name,
         versionId,
       });
-      
+
       this.instances = [...this.instances, instance];
-      
+
       // Set as active if it's the first instance
       if (this.instances.length === 1) {
         await this.setActiveInstance(instance.id);
       }
-      
+
       uiState.setStatus(`Instance "${name}" created successfully!`);
       return instance;
     } catch (e) {
@@ -71,13 +71,13 @@ export class InstancesState {
 
   // Delete an instance
   async deleteInstance(instanceId: string) {
-    const instance = this.instances.find(i => i.id === instanceId);
+    const instance = this.instances.find((i) => i.id === instanceId);
     if (!instance) return;
-    
+
     try {
       await invoke("delete_instance", { instanceId });
-      this.instances = this.instances.filter(i => i.id !== instanceId);
-      
+      this.instances = this.instances.filter((i) => i.id !== instanceId);
+
       // If deleted instance was active, select another
       if (this.activeInstanceId === instanceId) {
         this.activeInstanceId = this.instances.length > 0 ? this.instances[0].id : null;
@@ -85,7 +85,7 @@ export class InstancesState {
           await invoke("set_active_instance", { instanceId: this.activeInstanceId });
         }
       }
-      
+
       uiState.setStatus(`Instance "${instance.name}" deleted`);
     } catch (e) {
       console.error("Failed to delete instance:", e);
@@ -97,11 +97,9 @@ export class InstancesState {
   async updateInstance(instance: Instance): Promise<Instance | null> {
     try {
       const updated = await invoke<Instance>("update_instance", { instance });
-      
-      this.instances = this.instances.map(i => 
-        i.id === updated.id ? updated : i
-      );
-      
+
+      this.instances = this.instances.map((i) => (i.id === updated.id ? updated : i));
+
       uiState.setStatus(`Instance "${updated.name}" updated`);
       return updated;
     } catch (e) {
@@ -118,7 +116,7 @@ export class InstancesState {
         instanceId,
         newName,
       });
-      
+
       this.instances = [...this.instances, instance];
       uiState.setStatus(`Instance duplicated as "${newName}"`);
       return instance;
@@ -162,7 +160,7 @@ export class InstancesState {
         zipPath,
         name: name || null,
       });
-      
+
       this.instances = [...this.instances, instance];
       uiState.setStatus(`Instance "${instance.name}" imported successfully!`);
       return instance;
@@ -212,15 +210,15 @@ export class InstancesState {
   // Format relative time
   formatRelativeTime(timestamp: number | undefined): string {
     if (!timestamp) return "Never played";
-    
+
     const now = Date.now() / 1000;
     const diff = now - timestamp;
-    
+
     if (diff < 60) return "Just now";
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
     if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-    
+
     return this.formatDate(timestamp);
   }
 }
