@@ -83,13 +83,9 @@ async fn start_game(
         .clone()
         .ok_or("No active account found. Please login first.")?;
 
-    let account_type = match &account {
-        core::auth::Account::Offline(_) => "Offline",
-        core::auth::Account::Microsoft(_) => "Microsoft",
-    };
     emit_log!(
         window,
-        format!("Account found: {} ({})", account.username(), account_type)
+        format!("Account found: {}", account.username())
     );
 
     let config = config_state.config.lock().unwrap().clone();
