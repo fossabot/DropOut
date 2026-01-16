@@ -6,7 +6,9 @@ on:
       - "ui/**"
       - ".github/workflows/check.yml"
   pull_request:
-    branches: ["main", "master", "dev"]
+    paths:
+      - "ui/**"
+      - ".github/workflows/check.yml"
   workflow_dispatch:
 
 jobs:
@@ -32,3 +34,10 @@ jobs:
 
       - run: pnpm check
         working-directory: ui
+
+      - run: pnpm lint
+        working-directory: ui
+
+      - run: pnpm format --check
+        working-directory: ui
+        
